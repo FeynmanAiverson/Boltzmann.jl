@@ -4,16 +4,19 @@ Boltzmann.jl
 
 [![Build Status](https://travis-ci.org/dfdx/Boltzmann.jl.svg)](https://travis-ci.org/dfdx/Boltzmann.jl)
 
-Restricted Boltzmann machines and deep belief networks in Julia
+Restricted Boltzmann machines and deep belief networks in Julia.
+This particular package is a fork of [dfdx/Boltzmann.jl](https://github.com/dfdx/Boltzmann.jl) 
+with modificaitons made by the SPHINX Team @ ENS Paris.
+
 
 Installation
 ------------
+Currently, this package is unregistered with the Julia package manager. Once the modifications
+here are feature complete, we can either make the fork permanent or request a merge back into
+the [dfdx/Boltzmann.jl](https://github.com/dfdx/Boltzmann.jl) package. For now, installation
+should be accomplished via:
 
-    Pkg.add("Boltzmann")
-
-installing latest development version: 
-
-    Pkg.clone("https://github.com/dfdx/Boltzmann.jl")
+    Pkg.clone("https://github.com/sphinxteam/Boltzmann.jl")
 
 
 RBM Basic Usage
@@ -21,6 +24,7 @@ RBM Basic Usage
 
 Train RBM:
 
+```julia
     using Boltzmann
 
     X = randn(100, 2000)    # 2000 observations (examples) 
@@ -29,6 +33,7 @@ Train RBM:
     rbm = GRBM(100, 50)     # define Gaussian RBM with 100 visible (input) 
                             #  and 50 hidden (output) variables
     fit(rbm, X)             # fit model to data 
+```
 
 (for more meaningful dataset see [MNIST Example](https://github.com/dfdx/Boltzmann.jl/blob/master/examples/mnistexample.jl))
 
