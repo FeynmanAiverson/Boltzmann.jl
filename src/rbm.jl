@@ -57,7 +57,8 @@ function hid_means(rbm::RBM, vis::Mat{Float64})
 end
 
 
-function vis_means(rbm::RBM, hid::Mat{Float64})
+function vis_means(rbm::RBM, hid::Mat{Float64}, suppressedUnits::Vec{Bool})    
+    hid[suppressedUnits] = 0.0
     p = rbm.W' * hid .+ rbm.vbias
     return logistic(p)
 end
@@ -84,19 +85,38 @@ function sample_hiddens{V,H}(rbm::RBM{V, H}, vis::Mat{Float64})
 end
 
 
-function sample_visibles{V,H}(rbm::RBM{V,H}, hid::Mat{Float64})
-    means = vis_means(rbm, hid)
+function sample_visibles{V,H}(rbm::RBM{V,H}, hid::Mat{Float64}, suppressedUnits::Vec{Bool})
+    # At this point, `suppressedUnits` should no longee be an optional term. 
+    # Only gibbs() calls this function, and we are now, in dropout mode, always 
+    # generating the dropout pattern. It can, however, be a pattern of 0's, meaning
+    # that no units are dropped.
+    means = vis_means(rbm, hid, suppressedUnits)
     return sample(V, means)
 end
 
 
-function gibbs(rbm::RBM, vis::Mat{Float64}; n_times=1)
+function gibbs(rbm::RBM, vis::Mat{Float64}; n_times=1,dorate=0.0)
+    # To implement dropout, for this sampling stage, we need to
+    # choose a set of hidden variables to suppress.
+    #
+    # According to §8.2 of (Srivastava 2014), the dropout needs to
+    # happen on a per-sample basis, with a different dropout pattern
+    # used for every sample in the mini-batch. Hence, we apply the
+    # dropout within the Gibbs sampling stage.
+    #
+    # We need to remember that the visible units are being passed to
+    # here as a matrix, so we need to generate a matrix of dropout patterns.
+    suppressedUnits = rand(size(rbm.hbias,1),size(rbm.vis,2)) .< dorate   
+
+    # Every time we sample the visible units, we need to 
+    # make sure that we do so only using the "active" hidden
+    # units.
     v_pos = vis
     h_pos = sample_hiddens(rbm, v_pos)
-    v_neg = sample_visibles(rbm, h_pos)
+    v_neg = sample_visibles(rbm, h_pos;suppressedUnits)
     h_neg = sample_hiddens(rbm, v_neg)
     for i=1:n_times-1
-        v_neg = sample_visibles(rbm, h_neg)
+        v_neg = sample_visibles(rbm, h_neg;suppressedUnits)
         h_neg = sample_hiddens(rbm, v_neg)
     end
     return v_pos, h_pos, v_neg, h_neg
@@ -163,9 +183,8 @@ end
 
 
 function fit_batch!(rbm::RBM, vis::Mat{Float64};
-                    persistent=true, buf=None, lr=0.1, n_gibbs=1)
+                    persistent=true, buf=None, lr=0.1, n_gibbs=1,dorate=0.0)
     buf = buf == None ? zeros(size(rbm.W)) : buf
-    # v_pos, h_pos, v_neg, h_neg = gibbs(rbm, vis, n_times=n_gibbs)
     sampler = persistent ? persistent_contdiv : contdiv
     v_pos, h_pos, v_neg, h_neg = sampler(rbm, vis, n_gibbs)
     lr = lr / size(v_pos, 1)
@@ -196,7 +215,7 @@ end
 features(rbm::RBM; transpose=true) = components(rbm, transpose)
 
 function fit(rbm::RBM, X::Mat{Float64};
-             persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1)
+             persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1,dorate=0.0)
 #=
 The core RBM training function. Learns the weights and biasings using 
 either standard Contrastive Divergence (CD) or Persistent CD, depending on
@@ -207,10 +226,12 @@ the user options.
 - *X:* Set of training vectors
 
 ### Optional Inputs
- - *persistent:* Whether or not to use persistent-CD [default=true]
- - *n_iter:* Number of training epochs [default=10]
- - *batch_size:* Minibatch size [default=100]
- - *n_gibbs:* Number of Gibbs sampling steps on the Markov Chain [default=1]
+- *persistent:* Whether or not to use persistent-CD [default=true]
+- *n_iter:* Number of training epochs [default=10]
+- *batch_size:* Minibatch size [default=100]
+- *n_gibbs:* Number of Gibbs sampling steps on the Markov Chain [default=1]
+- *dorate:* Dropout-rate, specifies the percentage of hidden units which are dropped during
+            the training procedure [default=0.0]
 =#
     @assert minimum(X) >= 0 && maximum(X) <= 1
     n_samples = size(X, 2)
@@ -222,7 +243,7 @@ the user options.
             batch = X[:, ((i-1)*batch_size + 1):min(i*batch_size, end)]
             batch = full(batch)
             fit_batch!(rbm, batch, persistent=persistent,
-                       buf=w_buf, n_gibbs=n_gibbs)
+                       buf=w_buf, n_gibbs=n_gibbs,dorate=dorate)
         end
         toc()
         pseudo_likelihood = mean(score_samples(rbm, X))
