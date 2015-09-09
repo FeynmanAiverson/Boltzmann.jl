@@ -234,6 +234,7 @@ the user options.
             the training procedure [default=0.0]
 =#
     @assert minimum(X) >= 0 && maximum(X) <= 1
+    println("DEBUG: Fitting with Dropout")
     n_samples = size(X, 2)
     n_batches = @compat Int(ceil(n_samples / batch_size))
     w_buf = zeros(size(rbm.W))
