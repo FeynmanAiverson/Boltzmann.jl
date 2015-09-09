@@ -16,8 +16,9 @@ here are feature complete, we can either make the fork permanent or request a me
 the [dfdx/Boltzmann.jl](https://github.com/dfdx/Boltzmann.jl) package. For now, installation
 should be accomplished via:
 
+```julia
     Pkg.clone("https://github.com/sphinxteam/Boltzmann.jl")
-
+```
 
 RBM Basic Usage
 ---------------
@@ -39,16 +40,22 @@ Train RBM:
 
 After model is fitted, you can **extract learned components** (a.k.a. weights): 
 
+```julia
     comps = components(rbm)
-    
+```
+
 **transform** data vectors into new higher-level representation (e.g. for further classification): 
 
+```julia
     Xt = transform(rbm, X)  # vectors of X have length 100, vectors of Xt - length 50
+```
 
 or **generate** vectors similar to given ones (e.g. for recommendation, see example [here](https://github.com/dfdx/lastfm-rbm))
 
+```julia
     x = ... 
     x_new = generate(rbm, x)
+```
 
 RBMs can handle both - dense and sparse arrays. It cannot, however, handle DataArrays because it's up to application how to treat missing values.
 
@@ -69,6 +76,7 @@ Deep Belief Networks
 
 DBNs are created as a stack of named RBMs. Below is an example of training DBN for MNIST dataset:
 
+```julia
     using Boltzmann
     using MNIST
 
@@ -82,18 +90,21 @@ DBNs are created as a stack of named RBMs. Below is an example of training DBN f
     dbn = DBN(layers)
     fit(dbn, X)
     transform(dbn, X)
-
+```
 
 Deep Autoencoders
 -----------------
 
 Once built, DBN can be converted into a deep autoencoder. Continuing previous example:
 
+```julia
     dae = unroll(dbn)
-
+```
 DAEs cannot be trained directly, but can be used to transform input data:
 
+```julia
     transform(dae, X)
+```
 
 In this case output will have the same dimensionality as input, but with a noise removed.
 
@@ -103,6 +114,7 @@ Integration with Mocha
 
 [Mocha.jl](https://github.com/pluskid/Mocha.jl) is an excellent deep learning framework implementing auto-encoders and a number of fine-tuning algorithms. Boltzmann.jl allows to save pretrained model in a Mocha-compatible file format to be used later on for supervised learning. Below is a snippet of the essential API, while complete code is available in [Mocha Export Example](https://github.com/dfdx/Boltzmann.jl/blob/master/examples/mocha_export_example.jl):
 
+```julia
     # pretraining and exporting in Boltzmann.jl
     dbn_layers = [("vis", GRBM(100, 50)),
                   ("hid1", BernoulliRBM(50, 25)),
@@ -123,6 +135,6 @@ Integration with Mocha
     h5open(DBN_PATH) do h5
         load_network(h5, net)
     end
-
+```
 
 
