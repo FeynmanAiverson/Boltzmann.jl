@@ -106,7 +106,7 @@ function gibbs(rbm::RBM, vis::Mat{Float64}; n_times=1,dorate=0.0)
     #
     # We need to remember that the visible units are being passed to
     # here as a matrix, so we need to generate a matrix of dropout patterns.
-    suppressedUnits = rand(size(rbm.hbias,1),size(rbm.vis,2)) .< dorate   
+    suppressedUnits = rand(size(rbm.hbias,1),size(vis,2)) .< dorate   
 
     # Every time we sample the visible units, we need to 
     # make sure that we do so only using the "active" hidden
