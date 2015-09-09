@@ -215,7 +215,7 @@ end
 features(rbm::RBM; transpose=true) = components(rbm, transpose)
 
 function fit(rbm::RBM, X::Mat{Float64};
-             persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1,dorate=0.0)
+             persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1, dorate=0.0)
 #=
 The core RBM training function. Learns the weights and biasings using 
 either standard Contrastive Divergence (CD) or Persistent CD, depending on
@@ -243,7 +243,7 @@ the user options.
         for i=1:n_batches
             batch = X[:, ((i-1)*batch_size + 1):min(i*batch_size, end)]
             batch = full(batch)
-            fit_batch!(rbm, batch, persistent=persistent,
+            fit_batch!(rbm, batch, persistent=persistent;
                        buf=w_buf, n_gibbs=n_gibbs,dorate=dorate)
         end
         toc()
