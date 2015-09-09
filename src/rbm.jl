@@ -57,8 +57,8 @@ function hid_means(rbm::RBM, vis::Mat{Float64})
 end
 
 
-function vis_means(rbm::RBM, hid::Mat{Float64}, suppressedUnits::Vec{Bool})    
-    hid[suppressedUnits] = 0.0
+function vis_means(rbm::RBM, hid::Mat{Float64}, suppressedUnits::Mat{Bool})    
+    hid[suppressedUnits] = 0.0          # Suppress dropped hidden units
     p = rbm.W' * hid .+ rbm.vbias
     return logistic(p)
 end
@@ -85,7 +85,7 @@ function sample_hiddens{V,H}(rbm::RBM{V, H}, vis::Mat{Float64})
 end
 
 
-function sample_visibles{V,H}(rbm::RBM{V,H}, hid::Mat{Float64}, suppressedUnits::Vec{Bool})
+function sample_visibles{V,H}(rbm::RBM{V,H}, hid::Mat{Float64}, suppressedUnits::Mat{Bool})
     # At this point, `suppressedUnits` should no longee be an optional term. 
     # Only gibbs() calls this function, and we are now, in dropout mode, always 
     # generating the dropout pattern. It can, however, be a pattern of 0's, meaning
