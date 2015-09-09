@@ -175,30 +175,6 @@ function fit_batch!(rbm::RBM, vis::Mat{Float64};
     return rbm
 end
 
-
-function fit(rbm::RBM, X::Mat{Float64};
-             persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1)
-    @assert minimum(X) >= 0 && maximum(X) <= 1
-    n_samples = size(X, 2)
-    n_batches = @compat Int(ceil(n_samples / batch_size))
-    w_buf = zeros(size(rbm.W))
-    for itr=1:n_iter
-        tic()
-        for i=1:n_batches
-            # println("fitting $(i)th batch")
-            batch = X[:, ((i-1)*batch_size + 1):min(i*batch_size, end)]
-            batch = full(batch)
-            fit_batch!(rbm, batch, persistent=persistent,
-                       buf=w_buf, n_gibbs=n_gibbs)
-        end
-        toc()
-        pseudo_likelihood = mean(score_samples(rbm, X))
-        info("Iteration #$itr, pseudo-likelihood = $pseudo_likelihood")
-    end
-    return rbm
-end
-
-
 function transform(rbm::RBM, X::Mat{Float64})
     return hid_means(rbm, X)
 end
@@ -219,3 +195,38 @@ end
 # synonym
 features(rbm::RBM; transpose=true) = components(rbm, transpose)
 
+function fit(rbm::RBM, X::Mat{Float64};
+             persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1)
+#=
+The core RBM training function. Learns the weights and biasings using 
+either standard Contrastive Divergence (CD) or Persistent CD, depending on
+the user options. 
+
+### Required Inputs
+- *rbm:* RBM object, initialized by `RBM()`/`GRBM()`
+- *X:* Set of training vectors
+
+### Optional Inputs
+ - *persistent:* Whether or not to use persistent-CD [default=true]
+ - *n_iter:* Number of training epochs [default=10]
+ - *batch_size:* Minibatch size [default=100]
+ - *n_gibbs:* Number of Gibbs sampling steps on the Markov Chain [default=1]
+=#
+    @assert minimum(X) >= 0 && maximum(X) <= 1
+    n_samples = size(X, 2)
+    n_batches = @compat Int(ceil(n_samples / batch_size))
+    w_buf = zeros(size(rbm.W))
+    for itr=1:n_iter
+        tic()
+        for i=1:n_batches
+            batch = X[:, ((i-1)*batch_size + 1):min(i*batch_size, end)]
+            batch = full(batch)
+            fit_batch!(rbm, batch, persistent=persistent,
+                       buf=w_buf, n_gibbs=n_gibbs)
+        end
+        toc()
+        pseudo_likelihood = mean(score_samples(rbm, X))
+        info("Iteration #$itr, pseudo-likelihood = $pseudo_likelihood")
+    end
+    return rbm
+end
