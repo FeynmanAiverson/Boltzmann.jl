@@ -249,7 +249,7 @@ the user options.
         end
         toc()
         this_pl = mean(score_samples(rbm, X))
-        pseudo_likelihood[itr]
+        pseudo_likelihood[itr] = this_pl
         info("Iteration #$itr, pseudo-likelihood = $this_pl")
     end
     return rbm, pseudo_likelihood
