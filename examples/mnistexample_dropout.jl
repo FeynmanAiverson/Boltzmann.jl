@@ -3,6 +3,7 @@ using Boltzmann
 using MNIST
 using ImageView
 using Gadfly
+using DataFrames
 
 function plot_weights(W, imsize, padding=10)
     h, w = imsize
@@ -26,15 +27,25 @@ end
 
 
 function run_mnist()
-    X, y = testdata()  # test data is smaller, no need to downsample
+    # Configure Test
+    X, y = testdata()  
     HiddenUnits = 100
-    Epochs = 10
+    Epochs = 10    
     X = X ./ (maximum(X) - minimum(X))
-    m = BernoulliRBM(28*28, HiddenUnits) 
-    m, historical_pl = fit(m, X; persistent=true, lr=0.1, n_iter=Epochs, batch_size=100, n_gibbs=1, dorate=0.5)
-    # plot_weights(m.W[1:64, :], (28, 28))
-    PLPlot = plot(x=1:Epochs,y=historical_pl,Geom.line,Guide.ylabel("Pseudo-Liklihood"),Guide.xlabel("Training Epoch"))
+    m_do = BernoulliRBM(28*28, HiddenUnits)     
+    m = BernoulliRBM(28*28, HiddenUnits)     
+
+    # Fit Models
+    m_do, historical_pl_do = fit(m_do, X; persistent=true, lr=0.1, n_iter=Epochs, batch_size=100, n_gibbs=1, dorate=0.5)
+    m, historical_pl = fit(m, X; persistent=true, lr=0.1, n_iter=Epochs, batch_size=100, n_gibbs=1, dorate=0.0)
+
+    # Put results in dataframe
+    Results = DataFrame(Epochs=[1:n_iter;1:n_iter],PL=[historical_pl_do;historical_pl],UsingDropout=[trues(n_iter);falses(n_iter)])
+
+    # PLPlot = plot(x=1:Epochs,y=historical_pl,Geom.line,Guide.ylabel("Pseudo-Liklihood"),Guide.xlabel("Training Epoch"))
+    PLPlot = plot(Results,x="Epochs",y="PL",Color="UsingDropout",Geom.line,Guide.ylabel("Pseudo-Liklihood"),Guide.xlabel("Training Epoch"))
     draw(PDF("examples/Dropout_TrainingPL.pdf", 4inch, 3inch), PLPlot)
+    
     return m
 end
 
