@@ -255,7 +255,7 @@ the user options.
     info("  + Training Samples:   $n_samples")
     info("  + Features:           $n_features")
     info("  + Epochs to run:      $n_iter")
-    info("  + Persistent CD?:     $presistent")
+    info("  + Persistent CD?:     $persistent")
     info("  + Learning rate:      $lr")
     info("  + Drop-out Rate (p):  $dorate")
     info("  + Gibbs Steps:        $n_gibbs")    
