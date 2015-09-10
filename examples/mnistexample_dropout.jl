@@ -43,7 +43,7 @@ function run_mnist()
     Results = DataFrame(Epochs=[1:Epochs;1:Epochs],PL=[vec(historical_pl_do);vec(historical_pl)],UsingDropout=[trues(Epochs);falses(Epochs)])
 
     # PLPlot = plot(x=1:Epochs,y=historical_pl,Geom.line,Guide.ylabel("Pseudo-Liklihood"),Guide.xlabel("Training Epoch"))
-    PLPlot = plot(Results,x="Epochs",y="PL",Color="UsingDropout",Geom.line,Guide.ylabel("Pseudo-Liklihood"),Guide.xlabel("Training Epoch"))
+    PLPlot = plot(Results,x="Epochs",y="PL",color="UsingDropout",Geom.line,Guide.ylabel("Pseudo-Liklihood"),Guide.xlabel("Training Epoch"))
     draw(PDF("examples/Dropout_TrainingPL.pdf", 4inch, 3inch), PLPlot)
 
     return m
