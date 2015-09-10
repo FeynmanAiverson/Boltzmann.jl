@@ -30,7 +30,7 @@ function run_mnist()
     # Configure Test
     X, y = testdata()  
     HiddenUnits = 100
-    Epochs = 10    
+    Epochs = 30    
     X = X ./ (maximum(X) - minimum(X))
     m_do = BernoulliRBM(28*28, HiddenUnits)     
     m = BernoulliRBM(28*28, HiddenUnits)     
