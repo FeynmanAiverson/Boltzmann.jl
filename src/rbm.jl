@@ -202,6 +202,7 @@ The core RBM training function. Learns the weights and biasings using
 either standard Contrastive Divergence (CD) or Persistent CD, depending on
 the user options. 
 #RANDOM
+#RANDOM
 ### Required Inputs
 - *rbm:* RBM object, initialized by `RBM()`/`GRBM()`
 - *X:* Set of training vectors
