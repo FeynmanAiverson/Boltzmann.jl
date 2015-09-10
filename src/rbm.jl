@@ -240,11 +240,28 @@ the user options.
             the training procedure [default=0.0]
 =#
     @assert minimum(X) >= 0 && maximum(X) <= 1
-    println("DEBUG: Fitting with Dropout")
+    
+
     n_samples = size(X, 2)
+    n_features = size(X, 1)
     n_batches = @compat Int(ceil(n_samples / batch_size))
     w_buf = zeros(size(rbm.W))
     pseudo_likelihood = zeros(n_iter,1)
+    
+    # Print info to user
+    info("=====================================")
+    info("RBM Training")
+    info("=====================================")
+    info("  + Training Samples:   $n_samples")
+    info("  + Features:           $n_features")
+    info("  + Epochs to run:      $n_iter")
+    info("  + Persistent CD?:     $presistent")
+    info("  + Learning rate:      $lr")
+    info("  + Drop-out Rate (p):  $dorate")
+    info("  + Gibbs Steps:        $n_gibbs")    
+    info("=====================================")
+    
+    # Training Loop
     for itr=1:n_iter
         tic()
         for i=1:n_batches
