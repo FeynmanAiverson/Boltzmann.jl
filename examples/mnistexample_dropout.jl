@@ -33,7 +33,8 @@ function run_mnist()
     m = BernoulliRBM(28*28, HiddenUnits) 
     m, historical_pl = fit(m, X; persistent=true, lr=0.1, n_iter=Epochs, batch_size=100, n_gibbs=1, dorate=0.5)
     # plot_weights(m.W[1:64, :], (28, 28))
-    plot(x=1:Epochs,y=historical_pl,Geom.line,Guide.ylabel("Pseudo-Liklihood"),Guide.xlabel("Training Epoch"))
+    PLPlot = plot(x=1:Epochs,y=historical_pl,Geom.line,Guide.ylabel("Pseudo-Liklihood"),Guide.xlabel("Training Epoch"))
+    draw(PDF("examples/Dropout_TrainingPL.pdf", 4inch, 3inch), PLPlot)
     return m
 end
 
