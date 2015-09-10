@@ -40,7 +40,7 @@ function run_mnist()
     m, historical_pl = fit(m, X; persistent=true, lr=0.1, n_iter=Epochs, batch_size=100, n_gibbs=1, dorate=0.0)
 
     # Put results in dataframe
-    Results = DataFrame(Epochs=[1:Epochs;1:Epochs],PL=[historical_pl_do;historical_pl],UsingDropout=[trues(Epochs);falses(Epochs)])
+    Results = DataFrame(Epochs=[1:Epochs;1:Epochs],PL=[vec(historical_pl_do);vec(historical_pl)],UsingDropout=[trues(Epochs);falses(Epochs)])
 
     # PLPlot = plot(x=1:Epochs,y=historical_pl,Geom.line,Guide.ylabel("Pseudo-Liklihood"),Guide.xlabel("Training Epoch"))
     PLPlot = plot(Results,x="Epochs",y="PL",Color="UsingDropout",Geom.line,Guide.ylabel("Pseudo-Liklihood"),Guide.xlabel("Training Epoch"))
