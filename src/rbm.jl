@@ -248,8 +248,9 @@ the user options.
                        buf=w_buf, n_gibbs=n_gibbs,dorate=dorate)
         end
         toc()
-        pseudo_likelihood[itr] = mean(score_samples(rbm, X))
-        info("Iteration #$itr, pseudo-likelihood = $pseudo_likelihood")
+        this_pl = mean(score_samples(rbm, X))
+        pseudo_likelihood[itr]
+        info("Iteration #$itr, pseudo-likelihood = $this_pl")
     end
     return rbm, pseudo_likelihood
 end
