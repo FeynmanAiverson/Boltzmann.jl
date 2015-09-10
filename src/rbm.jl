@@ -169,21 +169,21 @@ function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf)
 end
 
 
-function contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int)
-    v_pos, h_pos, v_neg, h_neg = gibbs(rbm, vis, n_times=n_gibbs)
+function contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; dorate=0.0)
+    v_pos, h_pos, v_neg, h_neg = gibbs(rbm, vis; n_times=n_gibbs, dorate=dorate)
     return v_pos, h_pos, v_neg, h_neg
 end
 
 
-function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int)
+function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; dorate=0.0)
     if size(rbm.persistent_chain) != size(vis)
         # persistent_chain not initialized or batch size changed, re-initialize
         rbm.persistent_chain = vis
     end
     # take positive samples from real data
-    v_pos, h_pos, _, _ = gibbs(rbm, vis)
+    v_pos, h_pos, _, _ = gibbs(rbm, vis;dorate=dorate)
     # take negative samples from "fantasy particles"
-    rbm.persistent_chain, _, v_neg, h_neg = gibbs(rbm, vis, n_times=n_gibbs)
+    rbm.persistent_chain, _, v_neg, h_neg = gibbs(rbm, vis; n_times=n_gibbs, dorate=dorate)
     return v_pos, h_pos, v_neg, h_neg
 end
 
@@ -192,7 +192,7 @@ function fit_batch!(rbm::RBM, vis::Mat{Float64};
                     persistent=true, buf=None, lr=0.1, n_gibbs=1,dorate=0.0)
     buf = buf == None ? zeros(size(rbm.W)) : buf
     sampler = persistent ? persistent_contdiv : contdiv
-    v_pos, h_pos, v_neg, h_neg = sampler(rbm, vis, n_gibbs)
+    v_pos, h_pos, v_neg, h_neg = sampler(rbm, vis, n_gibbs;dorate=dorate)
     lr = lr / size(v_pos, 1)
     update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf)
     rbm.hbias += vec(lr * (sum(h_pos, 2) - sum(h_neg, 2)))
@@ -242,7 +242,7 @@ the user options.
     @assert minimum(X) >= 0 && maximum(X) <= 1
     
 
-    n_samples = size(X, 2)
+    n_samples = size(X, 2)h
     n_features = size(X, 1)
     n_batches = @compat Int(ceil(n_samples / batch_size))
     w_buf = zeros(size(rbm.W))
@@ -260,7 +260,7 @@ the user options.
     info("  + Drop-out Rate (p):  $dorate")
     info("  + Gibbs Steps:        $n_gibbs")    
     info("=====================================")
-    
+
     # Training Loop
     for itr=1:n_iter
         tic()
