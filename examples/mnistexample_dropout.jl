@@ -2,6 +2,7 @@
 using Boltzmann
 using MNIST
 using ImageView
+using Gadfly
 
 function plot_weights(W, imsize, padding=10)
     h, w = imsize
@@ -26,10 +27,13 @@ end
 
 function run_mnist()
     X, y = testdata()  # test data is smaller, no need to downsample
+    HiddenUnits = 100
+    Epochs = 10
     X = X ./ (maximum(X) - minimum(X))
-    m = BernoulliRBM(28*28, 300) 
-    fit(m, X; persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1, dorate=0.5)
-    plot_weights(m.W[1:64, :], (28, 28))
+    m = BernoulliRBM(28*28, HiddenUnits) 
+    m, historical_pl = fit(m, X; persistent=true, lr=0.1, n_iter=Epochs, batch_size=100, n_gibbs=1, dorate=0.5)
+    # plot_weights(m.W[1:64, :], (28, 28))
+    plot(x=1:Epochs,y=historical_pl,Geom.line,Guide.ylabel("Pseudo-Liklihood"),Guide.xlabel("Training Epoch"))
     return m
 end
 

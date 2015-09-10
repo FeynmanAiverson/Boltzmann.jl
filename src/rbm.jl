@@ -238,6 +238,7 @@ the user options.
     n_samples = size(X, 2)
     n_batches = @compat Int(ceil(n_samples / batch_size))
     w_buf = zeros(size(rbm.W))
+    pseudo_likelihood = zeros(n_iter,1)
     for itr=1:n_iter
         tic()
         for i=1:n_batches
@@ -247,8 +248,8 @@ the user options.
                        buf=w_buf, n_gibbs=n_gibbs,dorate=dorate)
         end
         toc()
-        pseudo_likelihood = mean(score_samples(rbm, X))
+        pseudo_likelihood[itr] = mean(score_samples(rbm, X))
         info("Iteration #$itr, pseudo-likelihood = $pseudo_likelihood")
     end
-    return rbm
+    return rbm, pseudo_likelihood
 end
