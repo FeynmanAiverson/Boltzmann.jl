@@ -242,7 +242,7 @@ the user options.
     @assert minimum(X) >= 0 && maximum(X) <= 1
     
 
-    n_samples = size(X, 2)h
+    n_samples = size(X, 2)
     n_features = size(X, 1)
     n_batches = @compat Int(ceil(n_samples / batch_size))
     w_buf = zeros(size(rbm.W))
