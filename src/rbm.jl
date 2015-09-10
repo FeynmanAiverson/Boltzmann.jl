@@ -112,14 +112,14 @@ function gibbs(rbm::RBM, vis::Mat{Float64}; n_times=1,dorate=0.0)
     # Applying Dropout
     h_pos[suppressedUnits] = 0.0
 
-    v_neg = sample_visibles(rbm, h_pos, suppressedUnits)
+    v_neg = sample_visibles(rbm, h_pos)
     h_neg = sample_hiddens(rbm, v_neg)
 
     # Applying Dropout
     h_neg[suppressedUnits] = 0.0
 
     for i=1:n_times-1
-        v_neg = sample_visibles(rbm, h_neg, suppressedUnits)
+        v_neg = sample_visibles(rbm, h_neg)
         h_neg = sample_hiddens(rbm, v_neg)
 
         # Applying Dropout
