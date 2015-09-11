@@ -4,6 +4,7 @@ using Base.Test
 usingApple = @osx? true : false
 
 if usingApple
+    ### 1. Test the bottleneck logsig function
     L = 256
     N = L^2
     Trials = 25
@@ -61,5 +62,36 @@ if usingApple
     println("Vector Accel Calculation: $vecBoost Times Faster")
     println("Matrix Accel Calculation: $matBoost Times Faster")
     println("Discrepency: $mse (MSE)")
+    println("===================================================")
+
+    ### 2. Test the Accelerated version of fit()
+    NFeatures = 784
+    NHidden = 300
+    NTrain = 10000
+
+    X = rand(NFeatures,NTrain)
+    rbm = BernoulliRBM(NFeatures,NHidden)
+
+    println("")
+    println("RBM Tests")
+    println("===================================================")    
+    info("WARMUP")
+    fit(rbm,X;accelerate=false)     # Warmup
+    info("No Accel")
+    tic()
+        fit(rbm,X;accelerate=false)
+    tRBM = toq()
+
+    info("WARMUP")
+    fit(rbm,X;accelerate=true)      # Warmup
+    info("With Accel")
+    tic()
+        fit(rbm,X;accelerate=true)
+    tRBMAccel = toq()
+
+    rbmBoost = tRBM ./ tRBMAccel
+
+    println("===================================================")
+    println("10 Iteration Accel PCD: $rbmBoost Times Faster")
     println("===================================================")
 end
