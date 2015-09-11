@@ -56,8 +56,10 @@ if usingApple
 
     vecBoost = tV./tVAccel
     matBoost = tM./tMAccel
+    mse = mean((Boltzmann.logistic(Xvec) - Boltzmann.logisticAccel(Xvec)).^2)
     println("===================================================")
     println("Vector Accel Calculation: $vecBoost Times Faster")
     println("Matrix Accel Calculation: $matBoost Times Faster")
+    println("Discrepency: $mse (MSE)")
     println("===================================================")
 end
