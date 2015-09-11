@@ -53,25 +53,12 @@ GRBM(n_vis::Int, n_hid::Int; sigma=0.001, momentum=0.9) =
 function logistic(x::Mat{Float64})
     ## Using Devectorize Macro
     @devec s = 1 ./ (1 + exp(-x))
-    
-    # # SIMD 
-    # s = zeros(x)
-    # @simd for i=1:length(x)
-    #     @inbounds s[i] = 1 ./ (1 + exp(-x[i]))
-    # end
-
     return s
 end
 
 function logistic(x::Vec{Float64})
     ## Using Devectorize Macro
     @devec s = 1 ./ (1 + exp(-x))
-
-    # # SIMD 
-    # s = zeros(x)
-    # @simd for i=1:length(x)
-    #     @inbounds s[i] = 1 ./ (1 + exp(-x[i]))
-    # end
     return s
 end
 
@@ -86,15 +73,12 @@ function vis_means(rbm::RBM, hid::Mat{Float64})
 end
 
 function sample(::Type{Bernoulli}, means::Mat{Float64})
-    # return convert(Mat{Float64},rand(size(means)) .< means)
-
-    # SIMD Approach?
     s = zeros(means)
     r = rand(size(means))
     @simd for i=1:length(means)
         @inbounds s[i] = r[i] < means[i] ? 1.0 : 0.0
     end
-    
+
     return s
 end
 
@@ -141,15 +125,11 @@ function vis_meansAccel(rbm::RBM, hid::Mat{Float64})
 end
 
 function sampleAccel(::Type{Bernoulli}, means::Mat{Float64})
-    # return convert(Mat{Float64},rand(size(means)) .< means)
-
-    # SIMD Approach?
     s = zeros(means)
     r = rand(size(means))
     @simd for i=1:length(means)
         @inbounds s[i] = r[i] < means[i] ? 1.0 : 0.0
-    end
-    
+    end    
     return s
 end
 
@@ -177,7 +157,7 @@ end
 
 
 
-function gibbs(rbm::RBM, vis::Mat{Float64}; n_times=1, accelerate=true)
+function gibbs(rbm::RBM, vis::Mat{Float64}; n_times=1, accelerate=false)
     v_pos = vis
     if accelerate
         # If the user has specified the use of the AppleAccelerate framework,
@@ -242,13 +222,13 @@ function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf)
 end
 
 
-function contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; accelerate=true)
+function contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; accelerate=false)
     v_pos, h_pos, v_neg, h_neg = gibbs(rbm, vis; n_times=n_gibbs, accelerate=accelerate)
     return v_pos, h_pos, v_neg, h_neg
 end
 
 
-function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; accelerate=true)
+function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; accelerate=false)
     if size(rbm.persistent_chain) != size(vis)
         # persistent_chain not initialized or batch size changed, re-initialize
         rbm.persistent_chain = vis
@@ -262,7 +242,7 @@ end
 
 
 function fit_batch!(rbm::RBM, vis::Mat{Float64};
-                    persistent=true, buf=None, lr=0.1, n_gibbs=1,accelerate=true)
+                    persistent=true, buf=None, lr=0.1, n_gibbs=1,accelerate=false)
     buf = buf == None ? zeros(size(rbm.W)) : buf
     # v_pos, h_pos, v_neg, h_neg = gibbs(rbm, vis, n_times=n_gibbs)
     sampler = persistent ? persistent_contdiv : contdiv
@@ -295,7 +275,7 @@ end
 features(rbm::RBM; transpose=true) = components(rbm, transpose)
 
 function fit(rbm::RBM, X::Mat{Float64};
-             persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1,accelerate=true)
+             persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1,accelerate=false)
 #=
 The core RBM training function. Learns the weights and biasings using 
 either standard Contrastive Divergence (CD) or Persistent CD, depending on

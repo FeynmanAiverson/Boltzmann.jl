@@ -77,10 +77,10 @@ if usingApple
     println("RBM Tests")
     println("===================================================")    
     info("WARMUP")
-    fit(rbm,X;accelerate=false,n_iter=Epochs)     # Warmup
+    fit(rbm,X;n_iter=Epochs)     # Warmup
     info("No Accel")
     tic()
-        fit(rbm,X;accelerate=false,n_iter=Epochs)
+        fit(rbm,X;n_iter=Epochs)
     tRBM = toq()
     info("==> Walltime: $tRBM sec")
     println("")
