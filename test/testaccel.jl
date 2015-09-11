@@ -68,6 +68,7 @@ if usingApple
     NFeatures = 784
     NHidden = 300
     NTrain = 10000
+    Epochs = 5
 
     X = rand(NFeatures,NTrain)
     rbm = BernoulliRBM(NFeatures,NHidden)
@@ -76,22 +77,25 @@ if usingApple
     println("RBM Tests")
     println("===================================================")    
     info("WARMUP")
-    fit(rbm,X;accelerate=false)     # Warmup
+    fit(rbm,X;accelerate=false,n_iter=Epochs)     # Warmup
     info("No Accel")
     tic()
-        fit(rbm,X;accelerate=false)
+        fit(rbm,X;accelerate=false,n_iter=Epochs)
     tRBM = toq()
+    info("==> Walltime: $tRBM sec")
+    println("")
 
     info("WARMUP")
-    fit(rbm,X;accelerate=true)      # Warmup
+    fit(rbm,X;accelerate=true,n_iter=Epochs)      # Warmup
     info("With Accel")
     tic()
-        fit(rbm,X;accelerate=true)
+        fit(rbm,X;accelerate=true,n_iter=Epochs)
     tRBMAccel = toq()
+    info("==> Walltime: $tRBMAccel sec")
 
     rbmBoost = tRBM ./ tRBMAccel
 
     println("===================================================")
-    println("10 Iteration Accel PCD: $rbmBoost Times Faster")
+    println("$Epochs Iteration Accel PCD: $rbmBoost Times Faster")
     println("===================================================")
 end
