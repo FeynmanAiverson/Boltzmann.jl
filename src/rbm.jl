@@ -2,6 +2,8 @@
 using Distributions
 using Base.LinAlg.BLAS
 using Compat
+using AppleAccelerate
+
 import Base.getindex
 import StatsBase.fit
 
@@ -48,6 +50,10 @@ GRBM(n_vis::Int, n_hid::Int; sigma=0.001, momentum=0.9) =
 
 function logistic(x)
     return 1 ./ (1 + exp(-x))
+end
+
+function logisticAccel(x)
+    return AppleAccelerate.rec(1+AppleAccelerate.exp(-x))
 end
 
 
