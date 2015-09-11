@@ -3,6 +3,7 @@ using Distributions
 using Base.LinAlg.BLAS
 using Compat
 using AppleAccelerate
+using Devectorize
 
 import Base.getindex
 import StatsBase.fit
@@ -49,8 +50,29 @@ GRBM(n_vis::Int, n_hid::Int; sigma=0.001, momentum=0.9) =
 
 
 ### Base Definitions
-function logistic(x)
-    return 1 ./ (1 + exp(-x))
+function logistic(x::Mat{Float64})
+    ## Using Devectorize Macro
+    @devec s = 1 ./ (1 + exp(-x))
+    
+    # # SIMD 
+    # s = zeros(x)
+    # @simd for i=1:length(x)
+    #     @inbounds s[i] = 1 ./ (1 + exp(-x[i]))
+    # end
+
+    return s
+end
+
+function logistic(x::Vec{Float64})
+    ## Using Devectorize Macro
+    @devec s = 1 ./ (1 + exp(-x))
+
+    # # SIMD 
+    # s = zeros(x)
+    # @simd for i=1:length(x)
+    #     @inbounds s[i] = 1 ./ (1 + exp(-x[i]))
+    # end
+    return s
 end
 
 function hid_means(rbm::RBM, vis::Mat{Float64})
@@ -64,7 +86,7 @@ function vis_means(rbm::RBM, hid::Mat{Float64})
 end
 
 function sample(::Type{Bernoulli}, means::Mat{Float64})
-    return float(rand(size(means)) .< means)
+    return convert(Mat{Float64},rand(size(means)) .< means)
 end
 
 function sample(::Type{Gaussian}, means::Mat{Float64})
@@ -89,8 +111,14 @@ end
 
 
 ### Apple Accelerate Definitions
-function logisticAccel(x)
-    return AppleAccelerate.rec(1+AppleAccelerate.exp(-x))
+function logisticAccel(x::Mat{Float64})
+    s = AppleAccelerate.rec(1+AppleAccelerate.exp(-x))
+    return s
+end
+
+function logisticAccel(x::Vec{Float64})
+    s = AppleAccelerate.rec(1+AppleAccelerate.exp(-x))
+    return s
 end
 
 function hid_meansAccel(rbm::RBM, vis::Mat{Float64})
@@ -104,7 +132,7 @@ function vis_meansAccel(rbm::RBM, hid::Mat{Float64})
 end
 
 function sampleAccel(::Type{Bernoulli}, means::Mat{Float64})
-    return float(rand(size(means)) .< means)
+    return convert(Mat{Float64},rand(size(means)) .< means)
 end
 
 function sampleAccel(::Type{Gaussian}, means::Mat{Float64})
@@ -125,7 +153,6 @@ function sample_visiblesAccel{V,H}(rbm::RBM{V,H}, hid::Mat{Float64})
     means = vis_meansAccel(rbm, hid)
     return sampleAccel(V, means)
 end
-### 
 
 
 
