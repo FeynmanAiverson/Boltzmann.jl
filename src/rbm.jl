@@ -86,7 +86,16 @@ function vis_means(rbm::RBM, hid::Mat{Float64})
 end
 
 function sample(::Type{Bernoulli}, means::Mat{Float64})
-    return convert(Mat{Float64},rand(size(means)) .< means)
+    # return convert(Mat{Float64},rand(size(means)) .< means)
+
+    # SIMD Approach?
+    s = zeros(means)
+    r = rand(size(means))
+    @simd for i=1:length(means)
+        @inbounds s[i] = r[i] < means[i] ? 1.0 : 0.0
+    end
+    
+    return s
 end
 
 function sample(::Type{Gaussian}, means::Mat{Float64})
@@ -132,7 +141,16 @@ function vis_meansAccel(rbm::RBM, hid::Mat{Float64})
 end
 
 function sampleAccel(::Type{Bernoulli}, means::Mat{Float64})
-    return convert(Mat{Float64},rand(size(means)) .< means)
+    # return convert(Mat{Float64},rand(size(means)) .< means)
+
+    # SIMD Approach?
+    s = zeros(means)
+    r = rand(size(means))
+    @simd for i=1:length(means)
+        @inbounds s[i] = r[i] < means[i] ? 1.0 : 0.0
+    end
+    
+    return s
 end
 
 function sampleAccel(::Type{Gaussian}, means::Mat{Float64})
