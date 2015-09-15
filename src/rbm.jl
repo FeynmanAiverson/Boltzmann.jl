@@ -221,6 +221,38 @@ function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf)
     copy!(rbm.dW_prev, dW)
 end
 
+function update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_mag)
+    dW = buf
+    # dW = (h_pos * v_pos') - (h_neg * v_neg')
+    gemm!('N', 'T', 1.0, h_neg, v_neg, 0.0, dW)
+    gemm!('N', 'T', 1.0, h_pos, v_pos, -1.0, dW)
+    # rbm.W += lr * dW
+    axpy!(lr, dW, rbm.W)
+    # Apply Weight-Decay Penalty
+    # rbm.W += -lr * L2-Penalty-Gradient
+    axpy!(lr*decay_mag,-rbm.W,rbm.W)
+    # rbm.W += rbm.momentum * rbm.dW_prev
+    axpy!(lr * rbm.momentum, rbm.dW_prev, rbm.W)
+    # save current dW
+    copy!(rbm.dW_prev, dW)
+end
+
+function update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_mag)
+    dW = buf
+    # dW = (h_pos * v_pos') - (h_neg * v_neg')
+    gemm!('N', 'T', 1.0, h_neg, v_neg, 0.0, dW)
+    gemm!('N', 'T', 1.0, h_pos, v_pos, -1.0, dW)
+    # rbm.W += lr * dW
+    axpy!(lr, dW, rbm.W)
+    # Apply Weight-Decay Penalty
+    #   rbm.W += -lr * L1-Penalty-Gradient
+    axpy!(lr*decay_mag,-sign(rbm.W),rbm.W)
+    # rbm.W += rbm.momentum * rbm.dW_prev
+    axpy!(lr * rbm.momentum, rbm.dW_prev, rbm.W)
+    # save current dW
+    copy!(rbm.dW_prev, dW)
+end
+
 
 function contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; accelerate=false)
     v_pos, h_pos, v_neg, h_neg = gibbs(rbm, vis; n_times=n_gibbs, accelerate=accelerate)
@@ -242,13 +274,23 @@ end
 
 
 function fit_batch!(rbm::RBM, vis::Mat{Float64};
-                    persistent=true, buf=None, lr=0.1, n_gibbs=1,accelerate=false)
+                    persistent=true, buf=None, lr=0.1, n_gibbs=1,accelerate=false,
+                    weight_decay="none",decay_magnitude=0.01)
     buf = buf == None ? zeros(size(rbm.W)) : buf
     # v_pos, h_pos, v_neg, h_neg = gibbs(rbm, vis, n_times=n_gibbs)
     sampler = persistent ? persistent_contdiv : contdiv
     v_pos, h_pos, v_neg, h_neg = sampler(rbm, vis, n_gibbs; accelerate=accelerate)
     lr=lr/size(v_pos,2)
-    update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf)
+
+    # Gradient Update on Weights
+    if weight_decay=="l2"
+        update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_magnitude)
+    elseif weight_decay=="l1"
+        update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_magnitude)
+    else
+        update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf)
+    end
+
     rbm.hbias += vec(lr * (sum(h_pos, 2) - sum(h_neg, 2)))
     rbm.vbias += vec(lr * (sum(v_pos, 2) - sum(v_neg, 2)))
     return rbm
@@ -275,7 +317,8 @@ end
 features(rbm::RBM; transpose=true) = components(rbm, transpose)
 
 function fit(rbm::RBM, X::Mat{Float64};
-             persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1,accelerate=false)
+             persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1,accelerate=false,
+             weight_decay="none",decay_magnitude=0.01)
 #=
 The core RBM training function. Learns the weights and biasings using 
 either standard Contrastive Divergence (CD) or Persistent CD, depending on
@@ -292,6 +335,11 @@ the user options.
  - *n_gibbs:* Number of Gibbs sampling steps on the Markov Chain [default=1]
  - *accelerate:* Flag controlling whether or not to use Apple's Accelerate framework
                  to speed up some computations. Unused on non-OSX systems. [default=true]
+ - *weight_decay:* A string value representing the regularization to add to apply to the 
+                   weight magnitude during training {"none","l1","l2"}/ [default="none"]
+ - *decay_magnitude:* Relative importance assigned to the weight regularization. Smaller
+                      values represent less regularization. Should be in range (0,1). 
+                      [default=0.01]
 =#
     @assert minimum(X) >= 0 && maximum(X) <= 1
 
@@ -307,7 +355,8 @@ the user options.
             batch = X[:, ((i-1)*batch_size + 1):min(i*batch_size, end)]
             batch = full(batch)
             fit_batch!(rbm, batch, persistent=persistent,
-                       buf=w_buf, n_gibbs=n_gibbs, accelerate=accelerate)
+                       buf=w_buf, n_gibbs=n_gibbs, accelerate=accelerate;
+                       weight_decay=weight_decay,decay_magnitude=decay_magnitude)
         end
         # toc()
         pseudo_likelihood = mean(score_samples(rbm, X))
