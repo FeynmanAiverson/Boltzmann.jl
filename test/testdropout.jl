@@ -40,12 +40,21 @@ function run_mnist()
     m, historical_pl = fit(m, X; persistent=true, lr=0.1, n_iter=Epochs, batch_size=100, n_gibbs=1, dorate=0.0)
 
     # Put results in dataframe
+    NoDropoutActivations = Boltzmann.transform(m,X)
+    DropoutActivations = Boltzmann.transform(m_do,X)
+
     Results = DataFrame(Epochs=[1:Epochs;1:Epochs],PL=[vec(historical_pl_do);vec(historical_pl)],UsingDropout=[trues(Epochs);falses(Epochs)])
 
-    PLPlot = plot(Results,x="Epochs",y="PL",color="UsingDropout",Geom.line,Guide.ylabel("Pseudo-Liklihood"),Guide.xlabel("Training Epoch"))
-    draw(PDF("Dropout_TrainingPL.pdf", 4inch, 3inch), PLPlot)
 
-    
+    # Plot Pseudo-liklihood
+    PLPlot = plot(Results,x="Epochs",y="PL",color="UsingDropout",Geom.line,Guide.ylabel("Pseudo-Liklihood"),Guide.xlabel("Training Epoch"))
+    draw(PDF("Dropout_TrainingPL.pdf", 12inch, 9inch), PLPlot)
+
+
+    # Plot Activations
+    Activations = DataFrame(Act=[vec(NoDropoutActivations);vec(DropoutActivations)],UsingDropout=[falses(vec(NoDropoutActivations));trues(vec(DropoutActivations))])
+    HAPlot = plot(Activations,x="Act",color="UsingDropout",Geom.histogram(bincount=100))
+    draw(PDF("HiddenActivations.pdf", 12inch, 9inch), HAPlot)    
 
     return m
 end
