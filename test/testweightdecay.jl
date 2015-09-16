@@ -10,9 +10,9 @@ function run_mnist()
     HiddenUnits = 100;
     Epochs = 10;
 
-    m = BernoulliRBM(28*28, HiddenUnits; momentum=0.95, dataset=X)
-    mwdQuad = BernoulliRBM(28*28, HiddenUnits; momentum=0.95 ,dataset=X)
-    mwdLin = BernoulliRBM(28*28, HiddenUnits; momentum=0.95, dataset=X)
+    m = BernoulliRBM(28*28, HiddenUnits; momentum=0.5, dataset=X)
+    mwdQuad = BernoulliRBM(28*28, HiddenUnits; momentum=0.5 ,dataset=X)
+    mwdLin = BernoulliRBM(28*28, HiddenUnits; momentum=0.5, dataset=X)
     
     # Attempt without weight decay
     info("Running Without Weight Decay")
@@ -22,13 +22,13 @@ function run_mnist()
 
     # Attempt with L2 weight decay
     info("Running With L2-Decay")
-    fit(mwdQuad, X;n_iter=Epochs,weight_decay="l2",decay_magnitude=0.3,lr=0.1)
+    fit(mwdQuad, X;n_iter=Epochs,weight_decay="l2",decay_magnitude=0.1,lr=0.1)
     chart_weights(mwdQuad.W, (28, 28);annotation="L2 Weight Decay")
     chart_weights_distribution(mwdQuad.W;filename="l2decay_distribution.pdf",bincount=200)
 
     # Attempt with L1 weight decay
     info("Running With L1-Decay")
-    fit(mwdLin, X;n_iter=Epochs,weight_decay="l1",decay_magnitude=0.3,lr=0.1)
+    fit(mwdLin, X;n_iter=Epochs,weight_decay="l1",decay_magnitude=0.1,lr=0.1)
     chart_weights(mwdLin.W, (28, 28);annotation="L1 Weight Decay")
     chart_weights_distribution(mwdLin.W;filename="l1decay_distribution.pdf",bincount=200)
 

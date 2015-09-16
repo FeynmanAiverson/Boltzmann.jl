@@ -240,15 +240,19 @@ end
 function update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_mag)
     dW = buf
     # dW = (h_pos * v_pos') - (h_neg * v_neg')
-    gemm!('N', 'T', 1.0, h_neg, v_neg, 0.0, dW)
-    gemm!('N', 'T', 1.0, h_pos, v_pos, -1.0, dW)
-    # rbm.W += lr * dW
-    axpy!(lr, dW, rbm.W)
+    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
+    gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
+
+    # rbm.W += rbm.momentum * rbm.dW_prev
+    axpy!(rbm.momentum, rbm.dW_prev, dW)
+
     # Apply Weight-Decay Penalty
     # rbm.W += -lr * L2-Penalty-Gradient
-    axpy!(lr*decay_mag,-rbm.W,rbm.W)
-    # rbm.W += rbm.momentum * rbm.dW_prev
-    axpy!(rbm.momentum, rbm.dW_prev, rbm.W)
+    axpy!(lr*decay_mag,-rbm.W,dW)
+
+    # rbm.W += lr * dW
+    axpy!(1.0, dW, rbm.W)
+    
     # save current dW
     copy!(rbm.dW_prev, dW)
 end
@@ -256,15 +260,19 @@ end
 function update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_mag)
     dW = buf
     # dW = (h_pos * v_pos') - (h_neg * v_neg')
-    gemm!('N', 'T', 1.0, h_neg, v_neg, 0.0, dW)
-    gemm!('N', 'T', 1.0, h_pos, v_pos, -1.0, dW)
-    # rbm.W += lr * dW
-    axpy!(lr, dW, rbm.W)
-    # Apply Weight-Decay Penalty
-    #   rbm.W += -lr * L1-Penalty-Gradient
-    axpy!(lr*decay_mag,-sign(rbm.W),rbm.W)
+    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
+    gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
+
     # rbm.W += rbm.momentum * rbm.dW_prev
-    axpy!(rbm.momentum, rbm.dW_prev, rbm.W)
+    axpy!(rbm.momentum, rbm.dW_prev, dW)
+
+    # Apply Weight-Decay Penalty
+    # rbm.W += -lr * L1-Penalty-Gradient
+    axpy!(lr*decay_mag,-sign(rbm.W),dW)
+
+    # rbm.W += lr * dW
+    axpy!(1.0, dW, rbm.W)
+    
     # save current dW
     copy!(rbm.dW_prev, dW)
 end
