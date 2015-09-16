@@ -21,6 +21,16 @@ function conf_smoke_test()
     fit(model, X)
 end
 
+function init_smoke_test()
+    model = RBM(Normal, Normal, 1000, 500;dataset=X)
+    fit(model, X)
+end
+
+info("brbm_smoke_test()")
 brbm_smoke_test()
+info("grbm_smoke_test()")
 grbm_smoke_test()
+info("conf_smoke_test()")
 conf_smoke_test()
+info("init_smoke_test()")
+init_smoke_test()

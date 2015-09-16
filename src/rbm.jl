@@ -25,12 +25,28 @@ abstract AbstractRBM
 end
 
 function RBM(V::Type, H::Type,
-             n_vis::Int, n_hid::Int; sigma=0.001, momentum=0.9)
-    RBM{V,H}(rand(Normal(0, sigma), (n_hid, n_vis)),
-        zeros(n_vis), zeros(n_hid),
-        zeros(n_hid, n_vis),
-        Array(Float64, 0, 0),
-        momentum)
+             n_vis::Int, n_hid::Int; sigma=0.01, momentum=0.5, dataset=[])
+
+    if isempty(dataset)
+        RBM{V,H}(rand(Normal(0, sigma), (n_hid, n_vis)),
+                 zeros(n_vis), 
+                 zeros(n_hid),
+                 zeros(n_hid, n_vis),
+                 Array(Float64, 0, 0),
+                 momentum)
+    else
+        ProbVis = mean(dataset,2)   # Mean across samples
+        ProbVis = max(ProbVis,1e-20)
+        ProbVis = min(ProbVis,1 - 1e-20)
+        @devec InitVis = log(ProbVis ./ (1-ProbVis))
+
+        RBM{V,H}(rand(Normal(0, sigma), (n_hid, n_vis)),
+             vec(InitVis), 
+             zeros(n_hid),
+             zeros(n_hid, n_vis),
+             Array(Float64, 0, 0),
+             momentum)
+    end
 end
 
 
