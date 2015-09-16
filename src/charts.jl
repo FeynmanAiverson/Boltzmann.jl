@@ -40,11 +40,15 @@ end
 function chart_weights_distribution(W;bincount=100,filename="")
     if length(filename) > 0
         # Write to file if filename specified
-        DistributionPlot = plot(x=vec(W),Geom.histogram(bincount=bincount))
+        DistributionPlot = plot(x=vec(W),Geom.histogram(bincount=bincount),
+                                Guide.xlabel("Weight Value"),Guide.ylabel("Frequency"),
+                                Guide.title("Distribution of Learned Weights"))
         draw(PDF(filename, 10inch, 6inch), DistributionPlot)
     else
         # Draw plot if no filename given
-        plot(x=vec(W),Geom.histogram(bincount=bincount))
+        plot(x=vec(W),Geom.histogram(bincount=bincount),
+                                Guide.xlabel("Weight Value"),Guide.ylabel("Frequency"),
+                                Guide.title("Distribution of Learned Weights"))
     end
 end
 
@@ -53,10 +57,14 @@ function chart_activation_distribution(rbm,X;bincount=100,filename="")
 
     if length(filename) > 0
         # Write to file if filename specified
-        DistributionPlot = plot(x=vec(Activations),Geom.histogram(bincount=bincount))
+        DistributionPlot = plot(x=vec(Activations),Geom.histogram(bincount=bincount),
+                                Guide.xlabel("Hidden Activation"),Guide.ylabel("Frequency"),
+                                Guide.title("Distribution of Hidden Activations for Dataset"))
         draw(PDF(filename, 10inch, 6inch), DistributionPlot)
     else
         # Draw plot if no filename given
-        plot(x=vec(Activations),Geom.histogram(bincount=bincount))
+        plot(x=vec(Activations),Geom.histogram(bincount=bincount),
+                                Guide.xlabel("Weight Value"),Guide.ylabel("Frequency"),
+                                Guide.title("Distribution of Learned Weights"))
     end
 end
