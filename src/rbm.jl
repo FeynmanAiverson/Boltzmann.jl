@@ -58,11 +58,11 @@ end
 
 
 typealias BernoulliRBM RBM{Bernoulli, Bernoulli}
-BernoulliRBM(n_vis::Int, n_hid::Int; sigma=0.001, momentum=0.9) =
-    RBM(Bernoulli, Bernoulli, n_vis, n_hid, sigma=sigma, momentum=momentum)
+BernoulliRBM(n_vis::Int, n_hid::Int; sigma=0.001, momentum=0.9, dataset=[]) =
+    RBM(Bernoulli, Bernoulli, n_vis, n_hid; sigma=sigma, momentum=momentum, dataset=dataset)
 typealias GRBM RBM{Gaussian, Bernoulli}
-GRBM(n_vis::Int, n_hid::Int; sigma=0.001, momentum=0.9) =
-    RBM(Gaussian, Bernoulli, n_vis, n_hid, sigma=sigma, momentum=momentum)
+GRBM(n_vis::Int, n_hid::Int; sigma=0.001, momentum=0.9, dataset=[]) =
+    RBM(Gaussian, Bernoulli, n_vis, n_hid; sigma=sigma, momentum=momentum, dataset=dataset)
 
 
 ### Base Definitions
