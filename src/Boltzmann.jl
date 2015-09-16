@@ -13,7 +13,10 @@ export RBM,
        features,
        unroll,
        save_params,
-       load_params
+       load_params,
+       chart_weights,
+       chart_weights_distribution,
+       chart_activation_distribution
 
 include("core.jl")
 
