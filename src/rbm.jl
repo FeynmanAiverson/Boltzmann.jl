@@ -248,7 +248,7 @@ function update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, b
     # rbm.W += -lr * L2-Penalty-Gradient
     axpy!(lr*decay_mag,-rbm.W,rbm.W)
     # rbm.W += rbm.momentum * rbm.dW_prev
-    axpy!(lr * rbm.momentum, rbm.dW_prev, rbm.W)
+    axpy!(rbm.momentum, rbm.dW_prev, rbm.W)
     # save current dW
     copy!(rbm.dW_prev, dW)
 end
@@ -264,7 +264,7 @@ function update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf,
     #   rbm.W += -lr * L1-Penalty-Gradient
     axpy!(lr*decay_mag,-sign(rbm.W),rbm.W)
     # rbm.W += rbm.momentum * rbm.dW_prev
-    axpy!(lr * rbm.momentum, rbm.dW_prev, rbm.W)
+    axpy!(rbm.momentum, rbm.dW_prev, rbm.W)
     # save current dW
     copy!(rbm.dW_prev, dW)
 end
