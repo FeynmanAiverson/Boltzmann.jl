@@ -10,9 +10,9 @@ function run_mnist()
     HiddenUnits = 100;
     Epochs = 10;
 
-    m = BernoulliRBM(28*28, HiddenUnits; momentum=0.2)
-    mwdQuad = BernoulliRBM(28*28, HiddenUnits; momentum=0.2)
-    mwdLin = BernoulliRBM(28*28, HiddenUnits; momentum=0.2)
+    m = BernoulliRBM(28*28, HiddenUnits; momentum=0.2,dataset=X)
+    mwdQuad = BernoulliRBM(28*28, HiddenUnits; momentum=0.2,dataset=X)
+    mwdLin = BernoulliRBM(28*28, HiddenUnits; momentum=0.2,dataset=X)
     
     # Attempt without weight decay
     info("Running Without Weight Decay")
