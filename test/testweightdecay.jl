@@ -38,10 +38,11 @@ function run_mnist()
     X, y = testdata()  # test data is smaller, no need to downsample
     X = X ./ (maximum(X) - minimum(X))
     X = X[:,1:1000]
+    HiddenUnits = 100;
 
-    m = BernoulliRBM(28*28, 300)
-    mwdQuad = BernoulliRBM(28*28, 300;momentum=0.2)
-    mwdLin = BernoulliRBM(28*28, 300;momentum=0.2)
+    m = BernoulliRBM(28*28, HiddenUnits)
+    mwdQuad = BernoulliRBM(28*28, HiddenUnits;momentum=0.2)
+    mwdLin = BernoulliRBM(28*28, HiddenUnits;momentum=0.2)
     
     # Attempt without weight decay
     info("Running Without Weight Decay")
