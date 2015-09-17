@@ -22,10 +22,15 @@ abstract AbstractRBM
     dW_prev::Matrix{Float64}
     persistent_chain::Matrix{Float64}
     momentum::Float64
+    HidDist::ASCIIString
+    VisDist::ASCIIString
 end
 
 function RBM(V::Type, H::Type,
              n_vis::Int, n_hid::Int; sigma=0.01, momentum=0.5, dataset=[])
+
+    vtype = @sprintf("%s",typeof(V()))
+    htype = @sprintf("%s",typeof(H()))
 
     if isempty(dataset)
         RBM{V,H}(rand(Normal(0, sigma), (n_hid, n_vis)),
@@ -33,7 +38,8 @@ function RBM(V::Type, H::Type,
                  zeros(n_hid),
                  zeros(n_hid, n_vis),
                  Array(Float64, 0, 0),
-                 momentum)
+                 momentum,
+                 vtype,htype)
     else
         ProbVis = mean(dataset,2)   # Mean across samples
         ProbVis = max(ProbVis,1e-20)
@@ -45,7 +51,8 @@ function RBM(V::Type, H::Type,
              zeros(n_hid),
              zeros(n_hid, n_vis),
              Array(Float64, 0, 0),
-             momentum)
+             momentum,
+             vtype,htype)
     end
 end
 
@@ -362,7 +369,9 @@ the user options.
                       values represent less regularization. Should be in range (0,1). 
                       [default=0.01]
 =#
-    @assert minimum(X) >= 0 && maximum(X) <= 1
+    if rbm.VisDist=="Distributions.Bernoulli"
+      @assert minimum(X) >= 0 && maximum(X) <= 1  
+    end
 
     # Check OS and deny AppleAccelerate to non-OSX systems
     accelerate = @osx? accelerate : false
