@@ -301,9 +301,10 @@ function fit_batch!(rbm::RBM, vis::Mat{Float64};
                     persistent=true, buf=None, lr=0.1, n_gibbs=1,accelerate=false,
                     weight_decay="none",decay_magnitude=0.01)
     buf = buf == None ? zeros(size(rbm.W)) : buf
-    # v_pos, h_pos, v_neg, h_neg = gibbs(rbm, vis, n_times=n_gibbs)
+
     sampler = persistent ? persistent_contdiv : contdiv
     v_pos, h_pos, v_neg, h_neg = sampler(rbm, vis, n_gibbs; accelerate=accelerate)
+
     lr=lr/size(v_pos,2)
 
     # Gradient Update on Weights
