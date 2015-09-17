@@ -68,7 +68,7 @@ if usingApple
     NFeatures = 784
     NHidden = 300
     NTrain = 10000
-    Epochs = 5
+    Epochs = 2
 
     X = rand(NFeatures,NTrain)
     rbm = BernoulliRBM(NFeatures,NHidden)
