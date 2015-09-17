@@ -169,10 +169,6 @@ function sample_visiblesAccel{V,H}(rbm::RBM{V,H}, hid::Mat{Float64})
 end
 
 
-
-
-
-
 function gibbs(rbm::RBM, vis::Mat{Float64}; n_times=1, accelerate=false)
     v_pos = vis
     if accelerate
