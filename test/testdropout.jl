@@ -5,39 +5,20 @@ using ImageView
 using Gadfly
 using DataFrames
 
-function plot_weights(W, imsize, padding=10)
-    h, w = imsize
-    n = size(W, 1)
-    rows = int(floor(sqrt(n)))
-    cols = int(ceil(n / rows))
-    halfpad = div(padding, 2)
-    dat = zeros(rows * (h + padding), cols * (w + padding))
-    for i=1:n
-        wt = W[i, :]
-        wim = reshape(wt, imsize)
-        wim = wim ./ (maximum(wim) - minimum(wim))
-        r = div(i - 1, cols) + 1
-        c = rem(i - 1, cols) + 1
-        dat[(r-1)*(h+padding)+halfpad+1 : r*(h+padding)-halfpad,
-            (c-1)*(w+padding)+halfpad+1 : c*(w+padding)-halfpad] = wim
-    end
-    view(dat)
-    return dat
-end
-
-
 function run_mnist()
     # Configure Test
     X, y = testdata()  
-    HiddenUnits = 100
-    Epochs = 5    
+    HiddenUnits = 256
+    Epochs = 15    
     X = X ./ (maximum(X) - minimum(X))
-    m_do = BernoulliRBM(28*28, HiddenUnits)     
-    m = BernoulliRBM(28*28, HiddenUnits)     
+    m_do = BernoulliRBM(28*28, HiddenUnits; momentum=0.95)     
+    m = BernoulliRBM(28*28, HiddenUnits; momentum = 0.5)     
 
     # Fit Models
-    m_do, historical_pl_do = fit(m_do, X; persistent=true, lr=0.1, n_iter=Epochs, batch_size=100, n_gibbs=1, dorate=0.5)
-    m, historical_pl = fit(m, X; persistent=true, lr=0.1, n_iter=Epochs, batch_size=100, n_gibbs=1, dorate=0.0)
+    m_do, historical_pl_do = fit(m_do, X; persistent=false, lr=0.1, n_iter=Epochs, batch_size=100, 
+                                          n_gibbs=1, dorate=0.5, weight_decay="l1",decay_magnitude=0.1)
+    m, historical_pl = fit(m, X; persistent=true, lr=0.1, n_iter=Epochs, batch_size=100, 
+                                 n_gibbs=1, dorate=0.0, weight_decay="l1",decay_magnitude=0.1)
 
     # Put results in dataframe
     NoDropoutActivations = Boltzmann.transform(m,X)
