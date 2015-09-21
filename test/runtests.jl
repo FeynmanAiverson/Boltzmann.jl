@@ -1,3 +1,4 @@
+# include("testcharts.jl")
 # include("testrbm.jl")
 # include("testmomentum.jl")
 # include("testaccel.jl")

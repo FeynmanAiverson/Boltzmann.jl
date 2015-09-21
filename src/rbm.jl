@@ -419,7 +419,7 @@ the user options.
         # Scoring
         this_pl = mean(score_samples(rbm, X))
         pseudo_likelihood[itr] = this_pl
-        info("Iteration #$itr, pseudo-likelihood = $this_pl")
+        println("[Epoch $itr], pseudo-likelihood = $this_pl")
     end
     return rbm, pseudo_likelihood
 end

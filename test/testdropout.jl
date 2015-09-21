@@ -37,8 +37,18 @@ function run_mnist()
     HAPlot = plot(Activations,x="Act",color="UsingDropout",Geom.histogram(bincount=100,density=true,position=:dodge),Guide.ylabel("Density"),Guide.xlabel("Hidden Layer Activations"))
     draw(PDF("HiddenActivations.pdf", 12inch, 9inch), HAPlot)    
 
+    # Weight charts and distributions
+    chart_weights(m_do.W, (28, 28);annotation="With Dropout")
+    chart_weights(m.W, (28, 28);annotation="Without Dropout")
+
+    chart_weights_distribution(m_do.W;filename="Dropout_WeightDist.pdf",bincount=200)
+    chart_weights_distribution(m.W;filename="NoDropout_WeightDist.pdf",bincount=200)
+
+
     return m
 end
 
 run_mnist()
 
+println("Press RETURN when ready")
+readline(STDIN)
