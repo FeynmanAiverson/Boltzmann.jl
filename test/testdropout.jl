@@ -53,7 +53,7 @@ function run_mnist()
 
     # Plot Activations
     Activations = DataFrame(Act=[vec(NoDropoutActivations);vec(DropoutActivations)],UsingDropout=[falses(vec(NoDropoutActivations));trues(vec(DropoutActivations))])
-    HAPlot = plot(Activations,x="Act",color="UsingDropout",Geom.histogram(bincount=100,density=true,position=:dodge))
+    HAPlot = plot(Activations,x="Act",color="UsingDropout",Geom.histogram(bincount=100,density=true,position=:dodge),Guide.ylabel("Density"),Guide.xlabel("Hidden Layer Activations"))
     draw(PDF("HiddenActivations.pdf", 12inch, 9inch), HAPlot)    
 
     return m
