@@ -2,6 +2,9 @@
 using Distributions
 using Base.LinAlg.BLAS
 using Compat
+using AppleAccelerate
+using Devectorize
+
 import Base.getindex
 import StatsBase.fit
 
@@ -22,12 +25,28 @@ abstract AbstractRBM
 end
 
 function RBM(V::Type, H::Type,
-             n_vis::Int, n_hid::Int; sigma=0.001, momentum=0.9)
-    RBM{V,H}(rand(Normal(0, sigma), (n_hid, n_vis)),
-        zeros(n_vis), zeros(n_hid),
-        zeros(n_hid, n_vis),
-        Array(Float64, 0, 0),
-        momentum)
+             n_vis::Int, n_hid::Int; sigma=0.01, momentum=0.5, dataset=[])
+
+    if isempty(dataset)
+        RBM{V,H}(rand(Normal(0, sigma), (n_hid, n_vis)),
+                 zeros(n_vis), 
+                 zeros(n_hid),
+                 zeros(n_hid, n_vis),
+                 Array(Float64, 0, 0),
+                 momentum)
+    else
+        ProbVis = mean(dataset,2)   # Mean across samples
+        ProbVis = max(ProbVis,1e-20)
+        ProbVis = min(ProbVis,1 - 1e-20)
+        @devec InitVis = log(ProbVis ./ (1-ProbVis))
+
+        RBM{V,H}(rand(Normal(0, sigma), (n_hid, n_vis)),
+             vec(InitVis), 
+             zeros(n_hid),
+             zeros(n_hid, n_vis),
+             Array(Float64, 0, 0),
+             momentum)
+    end
 end
 
 
@@ -39,34 +58,45 @@ end
 
 
 typealias BernoulliRBM RBM{Bernoulli, Bernoulli}
-BernoulliRBM(n_vis::Int, n_hid::Int; sigma=0.001, momentum=0.9) =
-    RBM(Bernoulli, Bernoulli, n_vis, n_hid, sigma=sigma, momentum=momentum)
+BernoulliRBM(n_vis::Int, n_hid::Int; sigma=0.001, momentum=0.9, dataset=[]) =
+    RBM(Bernoulli, Bernoulli, n_vis, n_hid; sigma=sigma, momentum=momentum, dataset=dataset)
 typealias GRBM RBM{Gaussian, Bernoulli}
-GRBM(n_vis::Int, n_hid::Int; sigma=0.001, momentum=0.9) =
-    RBM(Gaussian, Bernoulli, n_vis, n_hid, sigma=sigma, momentum=momentum)
+GRBM(n_vis::Int, n_hid::Int; sigma=0.001, momentum=0.9, dataset=[]) =
+    RBM(Gaussian, Bernoulli, n_vis, n_hid; sigma=sigma, momentum=momentum, dataset=dataset)
 
 
-function logistic(x)
-    return 1 ./ (1 + exp(-x))
+### Base Definitions
+function logistic(x::Mat{Float64})
+    ## Using Devectorize Macro
+    @devec s = 1 ./ (1 + exp(-x))
+    return s
 end
 
+function logistic(x::Vec{Float64})
+    ## Using Devectorize Macro
+    @devec s = 1 ./ (1 + exp(-x))
+    return s
+end
 
 function hid_means(rbm::RBM, vis::Mat{Float64})
     p = rbm.W * vis .+ rbm.hbias
     return logistic(p)
 end
 
-
 function vis_means(rbm::RBM, hid::Mat{Float64})    
     p = rbm.W' * hid .+ rbm.vbias
     return logistic(p)
 end
 
-
 function sample(::Type{Bernoulli}, means::Mat{Float64})
-    return float(rand(size(means)) .< means)
-end
+    s = zeros(means)
+    r = rand(size(means))
+    @simd for i=1:length(means)
+        @inbounds s[i] = r[i] < means[i] ? 1.0 : 0.0
+    end
 
+    return s
+end
 
 function sample(::Type{Gaussian}, means::Mat{Float64})
     sigma2 = 1                   # using fixed standard diviation
@@ -76,13 +106,11 @@ function sample(::Type{Gaussian}, means::Mat{Float64})
     end
     return samples
 end
-
     
 function sample_hiddens{V,H}(rbm::RBM{V, H}, vis::Mat{Float64})
     means = hid_means(rbm, vis)
     return sample(H, means)
 end
-
 
 function sample_visibles{V,H}(rbm::RBM{V,H}, hid::Mat{Float64})
     means = vis_means(rbm, hid)
@@ -90,7 +118,57 @@ function sample_visibles{V,H}(rbm::RBM{V,H}, hid::Mat{Float64})
 end
 
 
-function gibbs(rbm::RBM, vis::Mat{Float64}; n_times=1,dorate=0.0)
+### Apple Accelerate Definitions
+function logisticAccel(x::Mat{Float64})
+    s = AppleAccelerate.rec(1+AppleAccelerate.exp(-x))
+    return s
+end
+
+function logisticAccel(x::Vec{Float64})
+    s = AppleAccelerate.rec(1+AppleAccelerate.exp(-x))
+    return s
+end
+
+function hid_meansAccel(rbm::RBM, vis::Mat{Float64})
+    p = rbm.W * vis .+ rbm.hbias
+    return logisticAccel(p)
+end
+
+function vis_meansAccel(rbm::RBM, hid::Mat{Float64})
+    p = rbm.W' * hid .+ rbm.vbias
+    return logisticAccel(p)
+end
+
+function sampleAccel(::Type{Bernoulli}, means::Mat{Float64})
+    s = zeros(means)
+    r = rand(size(means))
+    @simd for i=1:length(means)
+        @inbounds s[i] = r[i] < means[i] ? 1.0 : 0.0
+    end    
+    return s
+end
+
+function sampleAccel(::Type{Gaussian}, means::Mat{Float64})
+    sigma2 = 1                   # using fixed standard diviation
+    samples = zeros(size(means))
+    for j=1:size(means, 2), i=1:size(means, 1)
+        samples[i, j] = rand(Normal(means[i, j], sigma2))
+    end
+    return samples
+end
+    
+function sample_hiddensAccel{V,H}(rbm::RBM{V, H}, vis::Mat{Float64})
+    means = hid_meansAccel(rbm, vis)
+    return sampleAccel(H, means)
+end
+
+function sample_visiblesAccel{V,H}(rbm::RBM{V,H}, hid::Mat{Float64})
+    means = vis_meansAccel(rbm, hid)
+    return sampleAccel(V, means)
+end
+
+
+function gibbs(rbm::RBM, vis::Mat{Float64}; n_times=1, accelerate=false, dorate=0.0)
     # To implement dropout, for this sampling stage, we need to
     # choose a set of hidden variables to suppress.
     #
@@ -103,27 +181,31 @@ function gibbs(rbm::RBM, vis::Mat{Float64}; n_times=1,dorate=0.0)
     # here as a matrix, so we need to generate a matrix of dropout patterns.
     suppressedUnits = rand(size(rbm.hbias,1),size(vis,2)) .< dorate   
 
-    # Every time we sample the visible units, we need to 
-    # make sure that we do so only using the "active" hidden
-    # units.
     v_pos = vis
-    h_pos = sample_hiddens(rbm, v_pos)
-
-    # Applying Dropout
-    h_pos[suppressedUnits] = 0.0
-
-    v_neg = sample_visibles(rbm, h_pos)
-    h_neg = sample_hiddens(rbm, v_neg)
-
-    # Applying Dropout
-    h_neg[suppressedUnits] = 0.0
-
-    for i=1:n_times-1
-        v_neg = sample_visibles(rbm, h_neg)
+    if accelerate
+        # If the user has specified the use of the AppleAccelerate framework,
+        # call the optimized Accelerate versions of the sampler
+        h_pos = sample_hiddensAccel(rbm, v_pos)
+        h_pos[suppressedUnits] = 0.0                        # Apply Dropout
+        v_neg = sample_visiblesAccel(rbm, h_pos)
+        h_neg = sample_hiddensAccel(rbm, v_neg)
+        h_neg[suppressedUnits] = 0.0                        # Apply Dropout
+        for i=1:n_times-1
+            v_neg = sample_visiblesAccel(rbm, h_neg)
+            h_neg = sample_hiddensAccel(rbm, v_neg)
+            h_neg[suppressedUnits] = 0.0                    # Apply Dropout
+        end
+    else        
+        h_pos = sample_hiddens(rbm, v_pos)
+        h_pos[suppressedUnits] = 0.0                        # Apply Dropout
+        v_neg = sample_visibles(rbm, h_pos)
         h_neg = sample_hiddens(rbm, v_neg)
-
-        # Applying Dropout
-        h_neg[suppressedUnits] = 0.0
+        h_neg[suppressedUnits] = 0.0                        # Apply Dropout
+        for i=1:n_times-1
+            v_neg = sample_visibles(rbm, h_neg)
+            h_neg = sample_hiddens(rbm, v_neg)
+            h_neg[suppressedUnits] = 0.0                    # Apply Dropout
+        end
     end
     return v_pos, h_pos, v_neg, h_neg
 end
@@ -158,43 +240,96 @@ end
 function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf)
     dW = buf
     # dW = (h_pos * v_pos') - (h_neg * v_neg')
-    gemm!('N', 'T', 1.0, h_neg, v_neg, 0.0, dW)
-    gemm!('N', 'T', 1.0, h_pos, v_pos, -1.0, dW)
+    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
+    gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
+    # rbm.dW += rbm.momentum * rbm.dW_prev
+    axpy!(rbm.momentum, rbm.dW_prev, dW)
     # rbm.W += lr * dW
-    axpy!(lr, dW, rbm.W)
+    axpy!(1.0, dW, rbm.W)
+    # save current dW
+    copy!(rbm.dW_prev, dW)
+end
+
+function update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_mag)
+    dW = buf
+    # dW = (h_pos * v_pos') - (h_neg * v_neg')
+    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
+    gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
+
     # rbm.W += rbm.momentum * rbm.dW_prev
-    axpy!(lr * rbm.momentum, rbm.dW_prev, rbm.W)
+    axpy!(rbm.momentum, rbm.dW_prev, dW)
+
+    # Apply Weight-Decay Penalty
+    # rbm.W += -lr * L2-Penalty-Gradient
+    axpy!(lr*decay_mag,-rbm.W,dW)
+
+    # rbm.W += lr * dW
+    axpy!(1.0, dW, rbm.W)
+    
+    # save current dW
+    copy!(rbm.dW_prev, dW)
+end
+
+function update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_mag)
+    dW = buf
+    # dW = (h_pos * v_pos') - (h_neg * v_neg')
+    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
+    gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
+
+    # rbm.W += rbm.momentum * rbm.dW_prev
+    axpy!(rbm.momentum, rbm.dW_prev, dW)
+
+    # Apply Weight-Decay Penalty
+    # rbm.W += -lr * L1-Penalty-Gradient
+    axpy!(lr*decay_mag,-sign(rbm.W),dW)
+
+    # rbm.W += lr * dW
+    axpy!(1.0, dW, rbm.W)
+    
     # save current dW
     copy!(rbm.dW_prev, dW)
 end
 
 
-function contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; dorate=0.0)
-    v_pos, h_pos, v_neg, h_neg = gibbs(rbm, vis; n_times=n_gibbs, dorate=dorate)
+function contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; accelerate=false, dorate=0.0)
+    v_pos, h_pos, v_neg, h_neg = gibbs(rbm, vis; n_times=n_gibbs, accelerate=accelerate, dorate=dorate)
     return v_pos, h_pos, v_neg, h_neg
 end
 
 
-function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; dorate=0.0)
+function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; accelerate=false,dorate=0.0)
     if size(rbm.persistent_chain) != size(vis)
         # persistent_chain not initialized or batch size changed, re-initialize
         rbm.persistent_chain = vis
     end
     # take positive samples from real data
-    v_pos, h_pos, _, _ = gibbs(rbm, vis;dorate=dorate)
+    v_pos, h_pos, _, _ = gibbs(rbm, vis;accelerate=accelerate,dorate=dorate)
     # take negative samples from "fantasy particles"
-    rbm.persistent_chain, _, v_neg, h_neg = gibbs(rbm, vis; n_times=n_gibbs, dorate=dorate)
+    rbm.persistent_chain, _, v_neg, h_neg = gibbs(rbm, vis; n_times=n_gibbs,accelerate=accelerate,dorate=dorate)
     return v_pos, h_pos, v_neg, h_neg
 end
 
 
 function fit_batch!(rbm::RBM, vis::Mat{Float64};
-                    persistent=true, buf=None, lr=0.1, n_gibbs=1,dorate=0.0)
+                    persistent=true, buf=None, lr=0.1, n_gibbs=1,accelerate=false,
+                    weight_decay="none",decay_magnitude=0.01,dorate=0.0)
+    
     buf = buf == None ? zeros(size(rbm.W)) : buf
+
     sampler = persistent ? persistent_contdiv : contdiv
-    v_pos, h_pos, v_neg, h_neg = sampler(rbm, vis, n_gibbs;dorate=dorate)
-    lr = lr / size(v_pos, 1)
-    update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf)
+    v_pos, h_pos, v_neg, h_neg = sampler(rbm, vis, n_gibbs; accelerate=accelerate, dorate=dorate)
+
+    lr=lr/size(v_pos,2)
+
+    # Gradient Update on Weights
+    if weight_decay=="l2"
+        update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_magnitude)
+    elseif weight_decay=="l1"
+        update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_magnitude)
+    else
+        update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf)
+    end
+
     rbm.hbias += vec(lr * (sum(h_pos, 2) - sum(h_neg, 2)))
     rbm.vbias += vec(lr * (sum(v_pos, 2) - sum(v_neg, 2)))
     return rbm
@@ -221,7 +356,8 @@ end
 features(rbm::RBM; transpose=true) = components(rbm, transpose)
 
 function fit(rbm::RBM, X::Mat{Float64};
-             persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1, dorate=0.0)
+             persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1,accelerate=false,
+             weight_decay="none",decay_magnitude=0.01, dorate=0.0)
 #=
 The core RBM training function. Learns the weights and biasings using 
 either standard Contrastive Divergence (CD) or Persistent CD, depending on
@@ -232,15 +368,24 @@ the user options.
 - *X:* Set of training vectors
 
 ### Optional Inputs
-- *persistent:* Whether or not to use persistent-CD [default=true]
-- *n_iter:* Number of training epochs [default=10]
-- *batch_size:* Minibatch size [default=100]
-- *n_gibbs:* Number of Gibbs sampling steps on the Markov Chain [default=1]
-- *dorate:* Dropout-rate, specifies the percentage of hidden units which are dropped during
+ - *persistent:* Whether or not to use persistent-CD [default=true]
+ - *n_iter:* Number of training epochs [default=10]
+ - *batch_size:* Minibatch size [default=100]
+ - *n_gibbs:* Number of Gibbs sampling steps on the Markov Chain [default=1]
+ - *accelerate:* Flag controlling whether or not to use Apple's Accelerate framework
+                 to speed up some computations. Unused on non-OSX systems. [default=true]
+ - *weight_decay:* A string value representing the regularization to add to apply to the 
+                   weight magnitude during training {"none","l1","l2"}/ [default="none"]
+ - *decay_magnitude:* Relative importance assigned to the weight regularization. Smaller
+                      values represent less regularization. Should be in range (0,1). 
+                      [default=0.01]
+ - *dorate:* Dropout-rate, specifies the percentage of hidden units which are dropped during
             the training procedure [default=0.0]
 =#
     @assert minimum(X) >= 0 && maximum(X) <= 1
-    
+
+    # Check OS and deny AppleAccelerate to non-OSX systems
+    accelerate = @osx? accelerate : false
 
     n_samples = size(X, 2)
     n_features = size(X, 1)
@@ -263,14 +408,15 @@ the user options.
 
     # Training Loop
     for itr=1:n_iter
-        tic()
+        # Loop over mini-batches
         for i=1:n_batches
             batch = X[:, ((i-1)*batch_size + 1):min(i*batch_size, end)]
             batch = full(batch)
             fit_batch!(rbm, batch, persistent=persistent;
-                       buf=w_buf, n_gibbs=n_gibbs,dorate=dorate)
+                       buf=w_buf, n_gibbs=n_gibbs,dorate=dorate,weight_decay=weight_decay,decay_magnitude=decay_magnitude)
         end
-        toc()
+
+        # Scoring
         this_pl = mean(score_samples(rbm, X))
         pseudo_likelihood[itr] = this_pl
         info("Iteration #$itr, pseudo-likelihood = $this_pl")
