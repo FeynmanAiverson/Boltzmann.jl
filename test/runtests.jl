@@ -18,3 +18,6 @@ include("testweightdecay.jl")
 
 # info("Running Test: testgaussianrbm.jl")
 # include("testgaussianrbm.jl")
+
+info("Running Test: testvalidation.jl")
+include("testvalidation.jl")
