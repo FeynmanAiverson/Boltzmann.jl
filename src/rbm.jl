@@ -107,7 +107,7 @@ function sample(::Type{Gaussian}, means::Mat{Float64})
     return samples
 end
     
-function sample_hiddens{V,H}(rbm::RBM{V, H}, vis::Mat{Float64})
+function sample_hiddens{V,H}(rbm::RBM{V,H}, vis::Mat{Float64})
     means = hid_means(rbm, vis)
     return sample(H, means)
 end
@@ -117,7 +117,21 @@ function sample_visibles{V,H}(rbm::RBM{V,H}, hid::Mat{Float64})
     return sample(V, means)
 end
 
+### Base MF definitions
+#### Naive mean field
+function mag_vis_naive(rbm::RBM, m_hid::Mat{Float64}) ## to be constrained to being only Bernoulli
+    x = rbm.W' * m_hid .+ rbm.vbias
+    return logistic(x)
+end    
 
+function mag_hid_naive(rbm::RBM, m_vis::Mat{Float64})   
+    x = rbm.W * m_vis .+ rbm.hbias
+    return logistic(x)
+end    
+
+#### Second order development
+
+#### Third order development
 
 ### Apple Accelerate Definitions
 function logisticAccel(x::Mat{Float64})
@@ -193,6 +207,17 @@ function gibbs(rbm::RBM, vis::Mat{Float64}; n_times=1, accelerate=false)
     return v_pos, h_pos, v_neg, h_neg
 end
 
+function iter_naive(rbm::RBM, vis::Mat{Float64}; n_times=1)
+    v_pos = vis
+    h_pos = sample_hiddens(rbm, v_pos)
+    m_vis = mag_vis_naive(rbm, h_pos)
+    m_hid = mag_hid_naive(rbm, m_vis)
+    for i=1:n_times-1
+        m_vis = mag_vis_naive(rbm, m_hid)
+        m_hid = mag_hid_naive(rbm, m_vis)
+    end
+    return v_pos, h_pos, m_vis, m_hid
+end    
 
 function free_energy(rbm::RBM, vis::Mat{Float64})
     vb = sum(vis .* rbm.vbias, 1)
@@ -219,8 +244,8 @@ function score_samples(rbm::RBM, vis::Mat{Float64}; sample_size=10000)
     return n_feat * log(logistic(fe_corrupted - fe))
 end
 
-
-function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf)
+# for 
+function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf; approx="CD")
     dW = buf
     # dW = (h_pos * v_pos') - (h_neg * v_neg')
     gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
@@ -274,32 +299,43 @@ function update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf,
 end
 
 
-function contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; accelerate=false)
-    v_pos, h_pos, v_neg, h_neg = gibbs(rbm, vis; n_times=n_gibbs, accelerate=accelerate)
+function contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; accelerate=false, approx="CD")
+    if approx=="naive" 
+        v_pos, h_pos, v_neg, h_neg = iter_naive(rbm, vis; n_times=n_gibbs)
+    else     
+        v_pos, h_pos, v_neg, h_neg = gibbs(rbm, vis; n_times=n_gibbs, accelerate=accelerate)
+    end    
     return v_pos, h_pos, v_neg, h_neg
 end
 
 
-function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; accelerate=false)
+function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; accelerate=false, approx="CD")
     if size(rbm.persistent_chain) != size(vis)
         # persistent_chain not initialized or batch size changed, re-initialize
         rbm.persistent_chain = vis
     end
-    # take positive samples from real data
-    v_pos, h_pos, _, _ = gibbs(rbm, vis;accelerate=accelerate)
-    # take negative samples from "fantasy particles"
-    rbm.persistent_chain, _, v_neg, h_neg = gibbs(rbm, vis; n_times=n_gibbs,accelerate=accelerate)
+    if approx=="naive"
+        v_pos, h_pos, _, _ = iter_naive(rbm, vis; n_times=n_gibbs)
+        _, _, v_neg, h_neg = iter_naive(rbm, rbm.persistent_chain; n_times=n_gibbs)
+        rbm.persistent_chain = v_neg
+    else
+        # take positive samples from real data
+        v_pos, h_pos, _, _ = gibbs(rbm, vis; accelerate=accelerate)
+        # take negative samples from "fantasy particles"
+        _, _, v_neg, h_neg = gibbs(rbm, rbm.persistent_chain; n_times=n_gibbs,accelerate=accelerate)
+        rbm.persistent_chain = v_neg
+    end    
     return v_pos, h_pos, v_neg, h_neg
 end
 
 
 function fit_batch!(rbm::RBM, vis::Mat{Float64};
                     persistent=true, buf=None, lr=0.1, n_gibbs=1,accelerate=false,
-                    weight_decay="none",decay_magnitude=0.01)
+                    weight_decay="none",decay_magnitude=0.01, approx="CD")
     buf = buf == None ? zeros(size(rbm.W)) : buf
 
     sampler = persistent ? persistent_contdiv : contdiv
-    v_pos, h_pos, v_neg, h_neg = sampler(rbm, vis, n_gibbs; accelerate=accelerate)
+    v_pos, h_pos, v_neg, h_neg = sampler(rbm, vis, n_gibbs; accelerate=accelerate, approx="CD")
 
     lr=lr/size(v_pos,2)
 
@@ -339,7 +375,7 @@ features(rbm::RBM; transpose=true) = components(rbm, transpose)
 
 function fit(rbm::RBM, X::Mat{Float64};
              persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1,accelerate=false,
-             weight_decay="none",decay_magnitude=0.01)
+             weight_decay="none",decay_magnitude=0.01, approx="CD")
 #=
 The core RBM training function. Learns the weights and biasings using 
 either standard Contrastive Divergence (CD) or Persistent CD, depending on
@@ -377,7 +413,7 @@ the user options.
             batch = full(batch)
             fit_batch!(rbm, batch, persistent=persistent,
                        buf=w_buf, n_gibbs=n_gibbs, accelerate=accelerate;
-                       weight_decay=weight_decay,decay_magnitude=decay_magnitude)
+                       weight_decay=weight_decay, decay_magnitude=decay_magnitude, approx=approx)
         end
         # toc()
         pseudo_likelihood = mean(score_samples(rbm, X))
