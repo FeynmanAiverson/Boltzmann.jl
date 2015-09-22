@@ -225,7 +225,8 @@ function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int)
     # take positive samples from real data
     v_pos, h_pos, _, _ = gibbs(rbm, vis)
     # take negative samples from "fantasy particles"
-    rbm.persistent_chain, _, v_neg, h_neg = gibbs(rbm, vis; n_times=n_gibbs)
+    _, _, v_neg, h_neg = gibbs(rbm, rbm.persistent_chain; n_times=n_gibbs)
+    rbm.persistent_chain = v_neg
     return v_pos, h_pos, v_neg, h_neg
 end
 
