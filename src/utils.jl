@@ -14,3 +14,24 @@ macro runonce(expr)
     end)
 end
 
+function normalize(x)
+    x=(x-minimum(x)) ./ (maximum(x) - minimum(x))
+    return x
+end
+
+function normalize!(x)
+    x=(x-minimum(x)) ./ (maximum(x) - minimum(x))
+end
+
+function binarize!(x;level=0.001)
+  @simd for i=1:length(x)
+    @inbounds x[i] = x[i] > level ? 1.0 : 0.0
+  end
+end
+
+function binarize(x;level=0.001)
+  @simd for i=1:length(x)
+    @inbounds x[i] = x[i] > level ? 1.0 : 0.0
+  end
+  return x
+end

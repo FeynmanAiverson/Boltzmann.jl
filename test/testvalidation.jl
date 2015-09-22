@@ -4,7 +4,7 @@ using Base.Test
 
 function run_mnist()
     X, y = testdata()  # test data is smaller, no need to downsample
-    X = X ./ (maximum(X) - minimum(X))
+    binarize!(X)
 
     TrainSet = X[:,1:7000]
     ValidSet = X[:,7001:end]

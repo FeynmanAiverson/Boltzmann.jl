@@ -9,15 +9,8 @@ function run_mnist()
 
 
     # Get all MNIST training data
-    X, y = traindata()  
-    #-- Raw
-    # X = X ./ (maximum(X) - minimum(X))
-    #-- Binary 
-    @simd for i=1:length(X)
-        @inbounds X[i] = X[i] > 0.001 ? 1.0 : 0.0
-    end
-
-
+    X, labels = traindata()  
+    binarize!(X)
 
     # Split validation set
     TrainSet = X[:,1:50000]

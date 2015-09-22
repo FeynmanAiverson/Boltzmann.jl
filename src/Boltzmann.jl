@@ -16,7 +16,11 @@ export RBM,
        load_params,
        chart_weights,
        chart_weights_distribution,
-       chart_activation_distribution
+       chart_activation_distribution,
+       binarize,
+       binarize!,
+       normalize,
+       normalize!
 
 include("core.jl")
 

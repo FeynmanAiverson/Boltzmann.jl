@@ -7,8 +7,9 @@ using Base.Test
 
 function run_mnist()
     X, y = testdata()  # test data is smaller, no need to downsample
-    X = X ./ (maximum(X) - minimum(X))
-    HiddenUnits = 100;
+    binarize!(X)
+
+    HiddenUnits = 256;
     Epochs = 10;
     LearningRate = 0.1;
 

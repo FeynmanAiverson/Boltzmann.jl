@@ -3,11 +3,6 @@ using Colors
 using ImageView
 using Gadfly
 
-function normalize(x)
-    x=(x-minimum(x)) ./ (maximum(x) - minimum(x))
-    return x
-end
-
 function chart_weights(W, imsize; padding=0, annotation="", filename="")
     h, w = imsize
     n = size(W, 1)

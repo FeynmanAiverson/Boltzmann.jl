@@ -7,11 +7,11 @@ using Base.Test
 
 function run_mnist()
     X, y = testdata()  # test data is smaller, no need to downsample
-    X = X ./ (maximum(X) - minimum(X))
+    binarize!(X)
 
-    TrainSet = X[:,1:7000]
-    ValidSet = X[:,7001:end]
-    HiddenUnits = 500;
+    TrainSet = X[:,1:9000]
+    ValidSet = X[:,9001:end]
+    HiddenUnits = 256;
     Epochs = 10;
 
     m = BernoulliRBM(28*28, HiddenUnits; momentum=0.5, dataset=TrainSet)
@@ -26,13 +26,13 @@ function run_mnist()
 
     # Attempt with L2 weight decay
     info("Running With L2-Decay")
-    fit(mwdQuad, TrainSet;n_iter=Epochs,weight_decay="l2",decay_magnitude=0.05,lr=0.005,validation=ValidSet)
+    fit(mwdQuad, TrainSet;n_iter=Epochs,weight_decay="l2",decay_magnitude=0.1,lr=0.005,validation=ValidSet)
     chart_weights(mwdQuad.W, (28, 28);annotation="L2 Weight Decay")
     chart_weights_distribution(mwdQuad.W;filename="l2decay_distribution.pdf",bincount=200)
 
     # Attempt with L1 weight decay
     info("Running With L1-Decay")
-    fit(mwdLin, TrainSet;n_iter=Epochs,weight_decay="l1",decay_magnitude=0.05,lr=0.005,validation=ValidSet)
+    fit(mwdLin, TrainSet;n_iter=Epochs,weight_decay="l1",decay_magnitude=0.1,lr=0.005,validation=ValidSet)
     chart_weights(mwdLin.W, (28, 28);annotation="L1 Weight Decay")
     chart_weights_distribution(mwdLin.W;filename="l1decay_distribution.pdf",bincount=200)
 
