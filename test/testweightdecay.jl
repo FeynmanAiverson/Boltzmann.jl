@@ -8,7 +8,7 @@ function run_mnist()
     X, y = testdata()  # test data is smaller, no need to downsample
     X = X ./ (maximum(X) - minimum(X))
     HiddenUnits = 500;
-    Epochs = 20;
+    Epochs = 10;
 
     m = BernoulliRBM(28*28, HiddenUnits; momentum=0.5, dataset=X)
     mwdQuad = BernoulliRBM(28*28, HiddenUnits; momentum=0.5 ,dataset=X)
@@ -37,6 +37,4 @@ end
 
 run_mnist()
 
-println("Press RETURN when ready")
-readline(STDIN)
 

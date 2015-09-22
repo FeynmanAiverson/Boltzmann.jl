@@ -25,7 +25,7 @@ abstract AbstractRBM
 end
 
 function RBM(V::Type, H::Type,
-             n_vis::Int, n_hid::Int; sigma=0.01, momentum=0.5, dataset=[])
+             n_vis::Int, n_hid::Int; sigma=0.01, momentum=0.0, dataset=[])
 
     if isempty(dataset)
         RBM{V,H}(rand(Normal(0, sigma), (n_hid, n_vis)),
@@ -367,11 +367,26 @@ the user options.
     # Check OS and deny AppleAccelerate to non-OSX systems
     accelerate = @osx? accelerate : false
 
+    n_features = size(X, 1)
     n_samples = size(X, 2)
     n_batches = @compat Int(ceil(n_samples / batch_size))
     w_buf = zeros(size(rbm.W))
+
+    # Print info to user
+    m_ = rbm.momentum
+    info("=====================================")
+    info("RBM Training")
+    info("=====================================")
+    info("  + Training Samples:   $n_samples")
+    info("  + Features:           $n_features")
+    info("  + Epochs to run:      $n_iter")
+    info("  + Persistent CD?:     $persistent")
+    info("  + Momentum:           $m_")
+    info("  + Learning rate:      $lr")
+    info("  + Gibbs Steps:        $n_gibbs")    
+    info("=====================================")
+
     for itr=1:n_iter
-        # tic()
         for i=1:n_batches
             batch = X[:, ((i-1)*batch_size + 1):min(i*batch_size, end)]
             batch = full(batch)
@@ -379,7 +394,6 @@ the user options.
                        buf=w_buf, n_gibbs=n_gibbs, accelerate=accelerate;
                        weight_decay=weight_decay,decay_magnitude=decay_magnitude)
         end
-        # toc()
         pseudo_likelihood = mean(score_samples(rbm, X))
         println("Iteration #$itr, pseudo-likelihood = $pseudo_likelihood")
     end

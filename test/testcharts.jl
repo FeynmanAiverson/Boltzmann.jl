@@ -7,7 +7,7 @@ X = rand(784,300)
 rbm = BernoulliRBM(784,100);
 
 function test_chart_weights()
-    chart_weights(rbm.W,(28,28);annotation="Test Annotation",filename="testout.jpg")
+    chart_weights(rbm.W,(28,28);annotation="Test Annotation")
 end
 
 function test_chart_weights_distribution()
