@@ -3,6 +3,7 @@ using Images
 using Boltzmann
 using MNIST
 using ImageView
+using Base.Test
 
 function run_mnist()
     X, y = testdata()  # test data is smaller, no need to downsample

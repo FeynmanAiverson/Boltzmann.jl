@@ -339,7 +339,7 @@ features(rbm::RBM; transpose=true) = components(rbm, transpose)
 
 function fit(rbm::RBM, X::Mat{Float64};
              persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1,accelerate=false,
-             weight_decay="none",decay_magnitude=0.01)
+             weight_decay="none",decay_magnitude=0.01,validation=[])
 #=
 The core RBM training function. Learns the weights and biasings using 
 either standard Contrastive Divergence (CD) or Persistent CD, depending on
@@ -361,16 +361,28 @@ the user options.
  - *decay_magnitude:* Relative importance assigned to the weight regularization. Smaller
                       values represent less regularization. Should be in range (0,1). 
                       [default=0.01]
+ - *validation:* An array of validation samples, e.g. a held out set of training data.
+                 If passed, `fit` will also track generalization progress during training.
+                 [default=empty-set]
 =#
     @assert minimum(X) >= 0 && maximum(X) <= 1
 
     # Check OS and deny AppleAccelerate to non-OSX systems
     accelerate = @osx? accelerate : false
 
+    n_valid=0
     n_features = size(X, 1)
     n_samples = size(X, 2)
     n_batches = @compat Int(ceil(n_samples / batch_size))
     w_buf = zeros(size(rbm.W))
+
+    # Check for the existence of a validation set
+    flag_use_validation=false
+    if length(validation)!=0
+        flag_use_validation=true
+        n_valid=size(validation,2)        
+    end
+
 
     # Print info to user
     m_ = rbm.momentum
@@ -384,6 +396,8 @@ the user options.
     info("  + Momentum:           $m_")
     info("  + Learning rate:      $lr")
     info("  + Gibbs Steps:        $n_gibbs")    
+    info("  + Validation Set?:    $flag_use_validation")    
+    info("  + Validation Samples: $n_valid")    
     info("=====================================")
 
     for itr=1:n_iter
@@ -394,8 +408,13 @@ the user options.
                        buf=w_buf, n_gibbs=n_gibbs, accelerate=accelerate;
                        weight_decay=weight_decay,decay_magnitude=decay_magnitude)
         end
-        pseudo_likelihood = mean(score_samples(rbm, X))
-        println("Iteration #$itr, pseudo-likelihood = $pseudo_likelihood")
+        pl = mean(score_samples(rbm, X))
+        if flag_use_validation
+            pl_valid = mean(score_samples(rbm, validation))
+            @printf("[Epoch %04d] Train(pl : %0.3f), Valid(pl : %0.3f)\n",itr,pl,pl_valid)
+        else
+            @printf("[Epoch %04d] Train(pl : %0.3f)\n",itr,pl)
+        end
     end
     return rbm
 end
