@@ -15,12 +15,24 @@ macro runonce(expr)
 end
 
 function normalize(x)
-    x=(x-minimum(x)) ./ (maximum(x) - minimum(x))
+    minx = minimum(x)
+    maxx = maximum(x)
+    ranx = maxx-minx
+
+    @simd for i=1:length(x)
+      @inbounds x[i] = (x[i]-minx) / ranx
+    end
     return x
 end
 
 function normalize!(x)
-    x=(x-minimum(x)) ./ (maximum(x) - minimum(x))
+    minx = minimum(x)
+    maxx = maximum(x)
+    ranx = maxx-minx
+
+    @simd for i=1:length(x)
+      @inbounds x[i] = (x[i]-minx) / ranx
+    end
 end
 
 function binarize!(x;level=0.001)

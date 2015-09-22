@@ -10,17 +10,22 @@ function chart_weights(W, imsize; padding=0, annotation="", filename="")
     cols = round(Int,ceil(n / rows))
     halfpad = div(padding, 2)
     dat = zeros(rows * (h + padding), cols * (w + padding))
+
+    # Sort receptive fields by energy
+    p = sum(W.^2,2)
+    p = sortperm(vec(p);rev=true)
+    W = W[p,:]
+
     for i=1:n
         wt = W[i, :]
         wim = reshape(wt, imsize)
-        wim = wim ./ (maximum(wim) - minimum(wim))
         r = div(i - 1, cols) + 1
         c = rem(i - 1, cols) + 1
         dat[(r-1)*(h+padding)+halfpad+1 : r*(h+padding)-halfpad,
             (c-1)*(w+padding)+halfpad+1 : c*(w+padding)-halfpad] = wim
     end
 
-    dat=normalize(dat)
+    normalize!(dat)
 
     # Make the image view
     imgc,img = ImageView.view(dat)
