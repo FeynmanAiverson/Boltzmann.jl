@@ -7,20 +7,21 @@ using DataFrames
 
 function run_mnist()
     # Configure Test
-    X, y = testdata()  
+    X, y = traindata()  
     HiddenUnits = 256
-    Epochs = 15    
+    Epochs = 10    
     X = X ./ (maximum(X) - minimum(X))
-    m_do = BernoulliRBM(28*28, HiddenUnits; momentum=0.95)     
+    m_do = BernoulliRBM(28*28, HiddenUnits; momentum=0.5)     
     m = BernoulliRBM(28*28, HiddenUnits; momentum = 0.5)     
 
-    # Fit Models
-    m_do, historical_pl_do = fit(m_do, X; persistent=false, lr=0.1, n_iter=Epochs, batch_size=100, 
-                                          n_gibbs=1, dorate=0.5, weight_decay="l1",decay_magnitude=0.1)
-    m, historical_pl = fit(m, X; persistent=true, lr=0.1, n_iter=Epochs, batch_size=100, 
-                                 n_gibbs=1, dorate=0.0, weight_decay="l1",decay_magnitude=0.1)
+    # With Dropout
+    m_do, historical_pl_do = fit(m_do, X; persistent=false, lr=0.01, n_iter=Epochs, batch_size=100, 
+                                          n_gibbs=1, dorate=0.5, weight_decay="l2",decay_magnitude=0.001)
 
-    # Put results in dataframe
+    m, historical_pl = fit(m, X; persistent=true, lr=0.01, n_iter=Epochs, batch_size=100, 
+                                 n_gibbs=1, dorate=0.0, weight_decay="l2",decay_magnitude=0.001)
+
+    # Without Dropout
     NoDropoutActivations = Boltzmann.transform(m,X)
     DropoutActivations = Boltzmann.transform(m_do,X)
 
