@@ -2,7 +2,6 @@
 using Distributions
 using Base.LinAlg.BLAS
 using Compat
-using AppleAccelerate
 using Devectorize
 
 import Base.getindex
@@ -117,79 +116,17 @@ function sample_visibles{V,H}(rbm::RBM{V,H}, hid::Mat{Float64})
     return sample(V, means)
 end
 
-
-
-### Apple Accelerate Definitions
-function logisticAccel(x::Mat{Float64})
-    s = AppleAccelerate.rec(1+AppleAccelerate.exp(-x))
-    return s
-end
-
-function logisticAccel(x::Vec{Float64})
-    s = AppleAccelerate.rec(1+AppleAccelerate.exp(-x))
-    return s
-end
-
-function hid_meansAccel(rbm::RBM, vis::Mat{Float64})
-    p = rbm.W * vis .+ rbm.hbias
-    return logisticAccel(p)
-end
-
-function vis_meansAccel(rbm::RBM, hid::Mat{Float64})
-    p = rbm.W' * hid .+ rbm.vbias
-    return logisticAccel(p)
-end
-
-function sampleAccel(::Type{Bernoulli}, means::Mat{Float64})
-    s = zeros(means)
-    r = rand(size(means))
-    @simd for i=1:length(means)
-        @inbounds s[i] = r[i] < means[i] ? 1.0 : 0.0
-    end    
-    return s
-end
-
-function sampleAccel(::Type{Gaussian}, means::Mat{Float64})
-    sigma2 = 1                   # using fixed standard diviation
-    samples = zeros(size(means))
-    for j=1:size(means, 2), i=1:size(means, 1)
-        samples[i, j] = rand(Normal(means[i, j], sigma2))
-    end
-    return samples
-end
-    
-function sample_hiddensAccel{V,H}(rbm::RBM{V, H}, vis::Mat{Float64})
-    means = hid_meansAccel(rbm, vis)
-    return sampleAccel(H, means)
-end
-
-function sample_visiblesAccel{V,H}(rbm::RBM{V,H}, hid::Mat{Float64})
-    means = vis_meansAccel(rbm, hid)
-    return sampleAccel(V, means)
-end
-
-
-function gibbs(rbm::RBM, vis::Mat{Float64}; n_times=1, accelerate=false)
+function gibbs(rbm::RBM, vis::Mat{Float64}; n_times=1)
     v_pos = vis
-    if accelerate
-        # If the user has specified the use of the AppleAccelerate framework,
-        # call the optimized Accelerate versions of the sampler
-        h_pos = sample_hiddensAccel(rbm, v_pos)
-        v_neg = sample_visiblesAccel(rbm, h_pos)
-        h_neg = sample_hiddensAccel(rbm, v_neg)
-        for i=1:n_times-1
-            v_neg = sample_visiblesAccel(rbm, h_neg)
-            h_neg = sample_hiddensAccel(rbm, v_neg)
-        end
-    else        
-        h_pos = sample_hiddens(rbm, v_pos)
-        v_neg = sample_visibles(rbm, h_pos)
+
+    h_pos = sample_hiddens(rbm, v_pos)
+    v_neg = sample_visibles(rbm, h_pos)
+    h_neg = sample_hiddens(rbm, v_neg)
+    for i=1:n_times-1
+        v_neg = sample_visibles(rbm, h_neg)
         h_neg = sample_hiddens(rbm, v_neg)
-        for i=1:n_times-1
-            v_neg = sample_visibles(rbm, h_neg)
-            h_neg = sample_hiddens(rbm, v_neg)
-        end
     end
+
     return v_pos, h_pos, v_neg, h_neg
 end
 
@@ -274,32 +211,32 @@ function update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf,
 end
 
 
-function contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; accelerate=false)
-    v_pos, h_pos, v_neg, h_neg = gibbs(rbm, vis; n_times=n_gibbs, accelerate=accelerate)
+function contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int)
+    v_pos, h_pos, v_neg, h_neg = gibbs(rbm, vis; n_times=n_gibbs)
     return v_pos, h_pos, v_neg, h_neg
 end
 
 
-function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; accelerate=false)
+function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int)
     if size(rbm.persistent_chain) != size(vis)
         # persistent_chain not initialized or batch size changed, re-initialize
         rbm.persistent_chain = vis
     end
     # take positive samples from real data
-    v_pos, h_pos, _, _ = gibbs(rbm, vis;accelerate=accelerate)
+    v_pos, h_pos, _, _ = gibbs(rbm, vis)
     # take negative samples from "fantasy particles"
-    rbm.persistent_chain, _, v_neg, h_neg = gibbs(rbm, vis; n_times=n_gibbs,accelerate=accelerate)
+    rbm.persistent_chain, _, v_neg, h_neg = gibbs(rbm, vis; n_times=n_gibbs)
     return v_pos, h_pos, v_neg, h_neg
 end
 
 
 function fit_batch!(rbm::RBM, vis::Mat{Float64};
-                    persistent=true, buf=None, lr=0.1, n_gibbs=1,accelerate=false,
+                    persistent=true, buf=None, lr=0.1, n_gibbs=1,
                     weight_decay="none",decay_magnitude=0.01)
     buf = buf == None ? zeros(size(rbm.W)) : buf
 
     sampler = persistent ? persistent_contdiv : contdiv
-    v_pos, h_pos, v_neg, h_neg = sampler(rbm, vis, n_gibbs; accelerate=accelerate)
+    v_pos, h_pos, v_neg, h_neg = sampler(rbm, vis, n_gibbs)
 
     lr=lr/size(v_pos,2)
 
@@ -338,7 +275,7 @@ end
 features(rbm::RBM; transpose=true) = components(rbm, transpose)
 
 function fit(rbm::RBM, X::Mat{Float64};
-             persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1,accelerate=false,
+             persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1,
              weight_decay="none",decay_magnitude=0.01,validation=[])
 #=
 The core RBM training function. Learns the weights and biasings using 
@@ -354,8 +291,6 @@ the user options.
  - *n_iter:* Number of training epochs [default=10]
  - *batch_size:* Minibatch size [default=100]
  - *n_gibbs:* Number of Gibbs sampling steps on the Markov Chain [default=1]
- - *accelerate:* Flag controlling whether or not to use Apple's Accelerate framework
-                 to speed up some computations. Unused on non-OSX systems. [default=true]
  - *weight_decay:* A string value representing the regularization to add to apply to the 
                    weight magnitude during training {"none","l1","l2"}/ [default="none"]
  - *decay_magnitude:* Relative importance assigned to the weight regularization. Smaller
@@ -366,9 +301,6 @@ the user options.
                  [default=empty-set]
 =#
     @assert minimum(X) >= 0 && maximum(X) <= 1
-
-    # Check OS and deny AppleAccelerate to non-OSX systems
-    accelerate = @osx? accelerate : false
 
     n_valid=0
     n_features = size(X, 1)
@@ -404,8 +336,8 @@ the user options.
         for i=1:n_batches
             batch = X[:, ((i-1)*batch_size + 1):min(i*batch_size, end)]
             batch = full(batch)
-            fit_batch!(rbm, batch, persistent=persistent,
-                       buf=w_buf, n_gibbs=n_gibbs, accelerate=accelerate;
+            fit_batch!(rbm, batch; persistent=persistent,
+                       buf=w_buf, n_gibbs=n_gibbs,
                        weight_decay=weight_decay,decay_magnitude=decay_magnitude)
         end
         pl = mean(score_samples(rbm, X))

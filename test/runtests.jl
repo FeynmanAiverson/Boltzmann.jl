@@ -7,9 +7,6 @@ include("testrbm.jl")
 info("Running Test: testmomentum.jl")
 include("testmomentum.jl")
 
-info("Running Test: testaccel.jl")
-include("testaccel.jl")
-
 info("Running Test: testnets.jl")
 include("testnets.jl")
 
