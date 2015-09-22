@@ -1,7 +1,6 @@
 
 using Boltzmann
 using MNIST
-using ImageView
 
 function run_mnist()
     # Set parameters
@@ -11,7 +10,14 @@ function run_mnist()
 
     # Get all MNIST training data
     X, y = traindata()  
-    X = X ./ (maximum(X) - minimum(X))
+    #-- Raw
+    # X = X ./ (maximum(X) - minimum(X))
+    #-- Binary 
+    @simd for i=1:length(X)
+        @inbounds X[i] = X[i] > 0.001 ? 1.0 : 0.0
+    end
+
+
 
     # Split validation set
     TrainSet = X[:,1:50000]
