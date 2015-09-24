@@ -341,7 +341,7 @@ function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf; approx="CD")
     copy!(rbm.dW_prev, dW)
 end
 
-function update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_mag)
+function update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_mag; approx="CD")
     dW = buf
     # dW = (h_pos * v_pos') - (h_neg * v_neg')
     gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
@@ -356,7 +356,7 @@ function update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, b
         buf3 = gemm('N','T', (h_neg-h_neg.^2) .* (0.5-h_neg), (v_neg-v_neg.^2) .* (0.5-v_neg)) .* rbm.W.^2
         axpy!(-2.0*lr, buf3, dW)  
         #println("third order term  ",sum(buf3)/(size(dW,1)*size(dW,2)))
-    end 
+    end  
     # rbm.W += rbm.momentum * rbm.dW_prev
     axpy!(rbm.momentum, rbm.dW_prev, dW)
 
@@ -371,11 +371,22 @@ function update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, b
     copy!(rbm.dW_prev, dW)
 end
 
-function update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_mag)
+function update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_mag ; approx="CD")
     dW = buf
     # dW = (h_pos * v_pos') - (h_neg * v_neg')
     gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
     gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
+
+    if contains(approx,"tap") 
+        buf2 = gemm('N', 'T', h_neg-h_neg.^2, v_neg-v_neg.^2) .* rbm.W  
+        axpy!(-lr, buf2, dW)
+        #println("second order term  ",sum(buf2)/(size(dW,1)*size(dW,2)))
+    end
+    if approx == "tap3"
+        buf3 = gemm('N','T', (h_neg-h_neg.^2) .* (0.5-h_neg), (v_neg-v_neg.^2) .* (0.5-v_neg)) .* rbm.W.^2
+        axpy!(-2.0*lr, buf3, dW)  
+        #println("third order term  ",sum(buf3)/(size(dW,1)*size(dW,2)))
+    end  
 
     # rbm.W += rbm.momentum * rbm.dW_prev
     axpy!(rbm.momentum, rbm.dW_prev, dW)
@@ -436,9 +447,9 @@ function fit_batch!(rbm::RBM, vis::Mat{Float64};
 
     # Gradient Update on Weights
     if weight_decay=="l2"
-        update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_magnitude)
+        update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_magnitude, approx=approx)
     elseif weight_decay=="l1"
-        update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_magnitude)
+        update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_magnitude, approx=approx)
     else
         update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, approx=approx)
     end
