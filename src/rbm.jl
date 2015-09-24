@@ -120,18 +120,71 @@ end
 ### Base MF definitions
 #### Naive mean field
 function mag_vis_naive(rbm::RBM, m_hid::Mat{Float64}) ## to be constrained to being only Bernoulli
-    x = rbm.W' * m_hid .+ rbm.vbias
-    return logistic(x)
+    # buf = rbm.W'*m_hid.+rbm.vbias
+    # buf = zeros(rbm.vbias)
+    # copy!(buf,rbm.vbias)
+    # gemm!('T', 'N', rbm.W, m_hid, 1.0, buf)
+    buf = gemm('T', 'N', rbm.W, m_hid) .+ rbm.vbias
+    return logistic(buf)
 end    
 
-function mag_hid_naive(rbm::RBM, m_vis::Mat{Float64})   
-    x = rbm.W * m_vis .+ rbm.hbias
-    return logistic(x)
+mag_vis_naive(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64})=mag_vis_naive(rbm, m_hid) # Defining a method with same arguments as other mean field approxiamtions
+
+function mag_hid_naive(rbm::RBM, m_vis::Mat{Float64}) 
+    # buf = rbm.W*m_vis.+rbm.hbias
+    # buf = zeros(rbm.hbias)
+    # copy!(buf,rbm.hbias)  
+    # gemm!('N', 'N', rbm.W, m_vis, 1.0, buf)
+    buf = gemm('N', 'N', rbm.W, m_vis) .+ rbm.hbias
+    return logistic(buf)
 end    
 
+mag_hid_naive(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64})=mag_hid_naive(rbm, m_vis) # Defining a method with same arguments as other mean field approxiamtio
+  
 #### Second order development
 
+function mag_vis_tap2(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64}) ## to be constrained to being only Bernoulli
+    # buf = rbm.W'*m_hid+rbm.vbias
+    # buf = zeros(rbm.vbias)
+    # copy!(buf,rbm.vbias)
+    # gemm!('T', 'N', rbm.W, m_hid, 1.0, buf)
+    buf = gemm('T', 'N', rbm.W, m_hid) .+ rbm.vbias
+    # \sum_j w_ij(m_j-m_jˆ2)(0.5-m_i)
+    second_order = gemm('T', 'N', rbm.W.^2, m_hid-m_hid.^2).*(0.5-m_vis)
+    axpy!(1.0, second_order, buf)
+    return logistic(buf)
+end  
+
+function mag_hid_tap2(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64})
+    buf = gemm('N', 'N', rbm.W, m_vis) .+ rbm.hbias
+    second_order = gemm('N', 'N', rbm.W.^2, m_vis-m_vis.^2).*(0.5-m_hid)
+    axpy!(1.0, second_order, buf)
+    return logistic(buf)
+end
+
 #### Third order development
+
+function mag_vis_tap3(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64}) ## to be constrained to being only Bernoulli
+    # buf = rbm.W'*m_hid+rbm.vbias
+    buf = gemm('T', 'N', rbm.W, m_hid) .+ rbm.vbias
+    # \sum_j w_ijˆ2(m_j-m_jˆ2)(0.5-m_i)
+    second_order = gemm('T', 'N', rbm.W.^2, m_hid-m_hid.^2).*(0.5-m_vis)
+    # \sum_j w_ijˆ3(1/3-2(m_i-m-iˆ2))(m_jˆ2-m_jˆ3)
+    third_order = gemm('T', 'N', rbm.W.^3, m_hid.^2-m_hid.^3).*(1/3-2*(m_vis-m_vis.^2))
+    axpy!(1.0, second_order, buf)
+    axpy!(1.0, third_order, buf)
+    return logistic(buf)
+end  
+
+function mag_hid_tap3(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64})
+    buf = gemm('N', 'N', rbm.W, m_vis) .+ rbm.hbias
+    second_order = gemm('N', 'N', rbm.W.^2, m_vis-m_vis.^2).*(0.5-m_hid)
+    third_order = gemm('N', 'N', rbm.W.^3, m_vis.^2-m_vis.^3).*(1/3-2*(m_hid-m_hid.^2))
+    axpy!(1.0, second_order, buf)
+    axpy!(1.0, third_order, buf)
+    return logistic(buf)
+end
+
 
 ### Apple Accelerate Definitions
 function logisticAccel(x::Mat{Float64})
@@ -207,17 +260,35 @@ function gibbs(rbm::RBM, vis::Mat{Float64}; n_times=1, accelerate=false)
     return v_pos, h_pos, v_neg, h_neg
 end
 
-function iter_naive(rbm::RBM, vis::Mat{Float64}; n_times=1)
+function iter_mag(rbm::RBM, vis::Mat{Float64}; n_times=1, approx="tap2")
     v_pos = vis
-    h_pos = sample_hiddens(rbm, v_pos)
-    m_vis = mag_vis_naive(rbm, h_pos)
-    m_hid = mag_hid_naive(rbm, m_vis)
+    h_pos = hid_means(rbm, v_pos)
+    if approx == "naive"
+        mag_vis = mag_vis_naive
+        mag_hid = mag_hid_naive
+    elseif approx == "tap3"
+        mag_vis = mag_vis_tap3
+        mag_hid = mag_hid_tap3
+    else    
+        mag_vis = mag_vis_tap2
+        mag_hid = mag_hid_tap2
+    end    
+
+    m_vis = 0.5 * mag_vis(rbm, vis, h_pos) + 0.5 * vis
+    m_hid = 0.5 * mag_hid(rbm, m_vis, h_pos) + 0.5 * h_pos
     for i=1:n_times-1
-        m_vis = mag_vis_naive(rbm, m_hid)
-        m_hid = mag_hid_naive(rbm, m_vis)
+       m_vis = 0.5 * mag_vis(rbm, m_vis, m_hid) + 0.5 * m_vis
+       m_hid = 0.5 * mag_hid(rbm, m_vis, m_hid) + 0.5 * m_hid
     end
     return v_pos, h_pos, m_vis, m_hid
 end    
+
+ # m_vis = mag_vis_naive(rbm, h_pos)
+ #    m_hid = mag_hid_naive(rbm, m_vis)
+ #    for i=1:n_times-1
+ #        m_vis = mag_vis_naive(rbm, m_hid)
+ #        m_hid = mag_hid_naive(rbm, m_vis)
+
 
 function free_energy(rbm::RBM, vis::Mat{Float64})
     vb = sum(vis .* rbm.vbias, 1)
@@ -247,9 +318,17 @@ end
 # for 
 function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf; approx="CD")
     dW = buf
-    # dW = (h_pos * v_pos') - (h_neg * v_neg')
-    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
+    # dW = pos - neg
     gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
+    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
+    if contains(approx,"tap") 
+        buf2 = gemm('N', 'T', h_neg-h_neg.^2, v_neg-v_neg.^2) .* rbm.W  
+        axpy!(lr, buf2, dW)
+    end
+    if approx == "tap3"
+        buf3 = gemm('N','T', (h_neg-h_neg.^2) .* (1-2*h_neg), (v_neg-v_neg.^2) .* (1-2*v_neg)) .* rbm.W.^2
+        axpy!(lr, buf3, dW)  
+    end    
     # rbm.dW += rbm.momentum * rbm.dW_prev
     axpy!(rbm.momentum, rbm.dW_prev, dW)
     # rbm.W += lr * dW
@@ -300,10 +379,10 @@ end
 
 
 function contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; accelerate=false, approx="CD")
-    if approx=="naive" 
-        v_pos, h_pos, v_neg, h_neg = iter_naive(rbm, vis; n_times=n_gibbs)
-    else     
+    if approx == "CD"     
         v_pos, h_pos, v_neg, h_neg = gibbs(rbm, vis; n_times=n_gibbs, accelerate=accelerate)
+    else
+        v_pos, h_pos, v_neg, h_neg = iter_mag(rbm, vis; n_times=n_gibbs, approx=approx)
     end    
     return v_pos, h_pos, v_neg, h_neg
 end
@@ -314,16 +393,18 @@ function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; accelerat
         # persistent_chain not initialized or batch size changed, re-initialize
         rbm.persistent_chain = vis
     end
-    if approx=="naive"
-        v_pos, h_pos, _, _ = iter_naive(rbm, vis; n_times=n_gibbs)
-        _, _, v_neg, h_neg = iter_naive(rbm, rbm.persistent_chain; n_times=n_gibbs)
-        rbm.persistent_chain = v_neg
-    else
+
+    if approx == "CD"
         # take positive samples from real data
         v_pos, h_pos, _, _ = gibbs(rbm, vis; accelerate=accelerate)
         # take negative samples from "fantasy particles"
         _, _, v_neg, h_neg = gibbs(rbm, rbm.persistent_chain; n_times=n_gibbs,accelerate=accelerate)
         rbm.persistent_chain = v_neg
+    else
+        v_pos, h_pos, _, _ = iter_mag(rbm, vis; n_times=n_gibbs, approx=approx)
+        _, _, v_neg, h_neg = iter_mag(rbm, rbm.persistent_chain; n_times=n_gibbs, approx=approx)
+        rbm.persistent_chain = v_neg
+
     end    
     return v_pos, h_pos, v_neg, h_neg
 end
@@ -335,7 +416,7 @@ function fit_batch!(rbm::RBM, vis::Mat{Float64};
     buf = buf == None ? zeros(size(rbm.W)) : buf
 
     sampler = persistent ? persistent_contdiv : contdiv
-    v_pos, h_pos, v_neg, h_neg = sampler(rbm, vis, n_gibbs; accelerate=accelerate, approx="CD")
+    v_pos, h_pos, v_neg, h_neg = sampler(rbm, vis, n_gibbs; accelerate=accelerate, approx=approx)
 
     lr=lr/size(v_pos,2)
 
@@ -345,7 +426,7 @@ function fit_batch!(rbm::RBM, vis::Mat{Float64};
     elseif weight_decay=="l1"
         update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_magnitude)
     else
-        update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf)
+        update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, approx=approx)
     end
 
     rbm.hbias += vec(lr * (sum(h_pos, 2) - sum(h_neg, 2)))
