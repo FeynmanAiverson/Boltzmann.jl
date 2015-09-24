@@ -319,15 +319,19 @@ end
 function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf; approx="CD")
     dW = buf
     # dW = pos - neg
-    gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
     gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
+    gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
+
+    #println("first order term   ",sum(dW)/(size(dW,1)*size(dW,2)))
     if contains(approx,"tap") 
         buf2 = gemm('N', 'T', h_neg-h_neg.^2, v_neg-v_neg.^2) .* rbm.W  
         axpy!(lr, buf2, dW)
+        #println("second order term  ",sum(buf2)/(size(dW,1)*size(dW,2)))
     end
     if approx == "tap3"
         buf3 = gemm('N','T', (h_neg-h_neg.^2) .* (1-2*h_neg), (v_neg-v_neg.^2) .* (1-2*v_neg)) .* rbm.W.^2
         axpy!(lr, buf3, dW)  
+        #println("third order term  ",sum(buf3)/(size(dW,1)*size(dW,2)))
     end    
     # rbm.dW += rbm.momentum * rbm.dW_prev
     axpy!(rbm.momentum, rbm.dW_prev, dW)
