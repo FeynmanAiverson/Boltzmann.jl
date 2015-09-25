@@ -283,12 +283,6 @@ function iter_mag(rbm::RBM, vis::Mat{Float64}; n_times=1, approx="tap2")
     return v_pos, h_pos, m_vis, m_hid
 end    
 
- # m_vis = mag_vis_naive(rbm, h_pos)
- #    m_hid = mag_hid_naive(rbm, m_vis)
- #    for i=1:n_times-1
- #        m_vis = mag_vis_naive(rbm, m_hid)
- #        m_hid = mag_hid_naive(rbm, m_vis)
-
 
 function free_energy(rbm::RBM, vis::Mat{Float64})
     vb = sum(vis .* rbm.vbias, 1)
@@ -314,6 +308,17 @@ function score_samples(rbm::RBM, vis::Mat{Float64}; sample_size=10000)
     fe_corrupted = free_energy(rbm, vis_corrupted)
     return n_feat * log(logistic(fe_corrupted - fe))
 end
+
+function score_samples_TAP(rbm::RBM, vis::Mat{Float64}; n_iter=3)
+    _, _, m_vis, m_hid = iter_mag(rbm, vis; n_times=n_iter, approx="tap2")
+
+    S = - sum(m_vis.*log(m_vis)+(1.0-m_vis).*log(1.0-m_vis),1) - sum(m_hid.*log(m_hid)+(1.0-m_hid).*log(1-m_hid),1)
+    U_naive = - gemv('T',m_vis,rbm.vbias)' - gemv('T',m_hid,rbm.hbias)' - sum(gemm('N','N',rbm.W,m_vis).*m_hid,1)
+    Onsager = - 0.5 * sum(gemm('N','N',rbm.W.^2,m_vis-m_vis.^2).*(m_hid-m_hid.^2),1)    
+    fe_tap = U_naive + Onsager - S
+    fe = free_energy(rbm, vis)
+    return fe_tap - fe
+end    
 
 # for 
 function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf; approx="CD")
@@ -523,7 +528,9 @@ the user options.
         end
         # toc()
         pseudo_likelihood = mean(score_samples(rbm, X))
-        println("Iteration #$itr, pseudo-likelihood = $pseudo_likelihood")
+        tap_likelihood = mean(score_samples_TAP(rbm, X))
+        println("Iteration #$itr, pseudo-likelihood = $pseudo_likelihood, tap-likelihood = $tap_likelihood")
+
     end
     return rbm
 end
