@@ -16,7 +16,8 @@ export RBM,
        load_params,
        chart_weights,
        chart_weights_distribution,
-       chart_activation_distribution
+       chart_activation_distribution,
+       chart_likelihood_evolution
 
 include("core.jl")
 

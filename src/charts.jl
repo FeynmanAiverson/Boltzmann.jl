@@ -68,3 +68,23 @@ function chart_activation_distribution(rbm,X;bincount=100,filename="")
                                 Guide.title("Distribution of Learned Weights"))
     end
 end
+
+function chart_likelihood_evolution(pseudo, tap; filename="")
+
+    if length(filename) > 0
+        # Write to file if filename specified
+        LikelihoodPlot = plot(  
+                                layer(x=1:length(pseudo),y=pseudo,Geom.point, Geom.line),
+                                layer(x=1:length(tap),y=tap, Geom.point, Geom.line, Theme(default_color=colorant"green")),
+                                Guide.xlabel("epochs"),Guide.ylabel("Likelihood"),Guide.title("Evolution of likelihood for training set")
+                            )
+        draw(PDF(filename, 10inch, 6inch), LikelihoodPlot)
+    else
+        # Draw plot if no filename given
+       plot(  
+                                layer(x=1:length(pseudo),y=pseudo,Geom.point, Geom.line),
+                                layer(x=1:length(tap),y=tap, Geom.point, Geom.line, Theme(default_color=colorant"green")),
+                                Guide.xlabel("epochs"),Guide.ylabel("Likelihood"),Guide.title("Evolution of likelihood for training set")
+                            )
+    end
+end

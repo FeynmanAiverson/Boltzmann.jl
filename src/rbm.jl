@@ -312,7 +312,7 @@ end
 function score_samples_TAP(rbm::RBM, vis::Mat{Float64}; n_iter=3)
     _, _, m_vis, m_hid = iter_mag(rbm, vis; n_times=n_iter, approx="tap2")
 
-    S = - sum(m_vis.*log(m_vis)+(1.0-m_vis).*log(1.0-m_vis),1) - sum(m_hid.*log(m_hid)+(1.0-m_hid).*log(1-m_hid),1)
+    S = - sum(m_vis.*log(m_vis)+(1.0-m_vis).*log(1.0-m_vis),1) - sum(m_hid.*log(m_hid)+(1.0-m_hid).*log(1.0-m_hid),1)
     U_naive = - gemv('T',m_vis,rbm.vbias)' - gemv('T',m_hid,rbm.hbias)' - sum(gemm('N','N',rbm.W,m_vis).*m_hid,1)
     Onsager = - 0.5 * sum(gemm('N','N',rbm.W.^2,m_vis-m_vis.^2).*(m_hid-m_hid.^2),1)    
     fe_tap = U_naive + Onsager - S
@@ -517,6 +517,8 @@ the user options.
     n_samples = size(X, 2)
     n_batches = @compat Int(ceil(n_samples / batch_size))
     w_buf = zeros(size(rbm.W))
+    pseudo_likelihood = zeros(n_iter,1)
+    tap_likelihood = zeros(n_iter,1)
     for itr=1:n_iter
         # tic()
         for i=1:n_batches
@@ -527,10 +529,12 @@ the user options.
                        weight_decay=weight_decay, decay_magnitude=decay_magnitude, approx=approx)
         end
         # toc()
-        pseudo_likelihood = mean(score_samples(rbm, X))
-        tap_likelihood = mean(score_samples_TAP(rbm, X))
-        println("Iteration #$itr, pseudo-likelihood = $pseudo_likelihood, tap-likelihood = $tap_likelihood")
+        pseudo = mean(score_samples(rbm, X))
+        tap = mean(score_samples_TAP(rbm, X))
+        println("Iteration #$itr, pseudo-likelihood = $pseudo, tap-likelihood = $tap")
+        pseudo_likelihood[itr] = pseudo
+        tap_likelihood[itr] = tap
 
     end
-    return rbm
+    return rbm, pseudo_likelihood, tap_likelihood
 end
