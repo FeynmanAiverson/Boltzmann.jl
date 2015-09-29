@@ -120,6 +120,7 @@ end
 ### Base MF definitions
 #### Naive mean field
 function mag_vis_naive(rbm::RBM, m_hid::Mat{Float64}) ## to be constrained to being only Bernoulli
+    # print("naive")
     # buf = rbm.W'*m_hid.+rbm.vbias
     # buf = zeros(rbm.vbias)
     # copy!(buf,rbm.vbias)
@@ -144,6 +145,7 @@ mag_hid_naive(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64})=mag_hid_naive(
 #### Second order development
 
 function mag_vis_tap2(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64}) ## to be constrained to being only Bernoulli
+    # print("tap2")
     # buf = rbm.W'*m_hid+rbm.vbias
     # buf = zeros(rbm.vbias)
     # copy!(buf,rbm.vbias)
@@ -165,6 +167,7 @@ end
 #### Third order development
 
 function mag_vis_tap3(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64}) ## to be constrained to being only Bernoulli
+    # print("tap3")
     # buf = rbm.W'*m_hid+rbm.vbias
     buf = gemm('T', 'N', rbm.W, m_hid) .+ rbm.vbias
     # \sum_j w_ijˆ2(m_j-m_jˆ2)(0.5-m_i)
@@ -237,6 +240,7 @@ end
 
 
 function gibbs(rbm::RBM, vis::Mat{Float64}; n_times=1, accelerate=false)
+    #print("gibbs")
     v_pos = vis
     if accelerate
         # If the user has specified the use of the AppleAccelerate framework,
@@ -309,8 +313,13 @@ function score_samples(rbm::RBM, vis::Mat{Float64}; sample_size=10000)
     return n_feat * log(logistic(fe_corrupted - fe))
 end
 
-function score_samples_TAP(rbm::RBM, vis::Mat{Float64}; n_iter=3)
+function score_samples_TAP(rbm::RBM, vis::Mat{Float64}; n_iter=5)
     _, _, m_vis, m_hid = iter_mag(rbm, vis; n_times=n_iter, approx="tap2")
+
+    m_vis = max(m_vis, 1e-20)
+    m_vis = min(m_vis, 1.0-1e-20)
+    m_hid = max(m_hid, 1e-20)
+    m_hid = min(m_hid, 1.0-1e-20)
 
     S = - sum(m_vis.*log(m_vis)+(1.0-m_vis).*log(1.0-m_vis),1) - sum(m_hid.*log(m_hid)+(1.0-m_hid).*log(1.0-m_hid),1)
     U_naive = - gemv('T',m_vis,rbm.vbias)' - gemv('T',m_hid,rbm.hbias)' - sum(gemm('N','N',rbm.W,m_vis).*m_hid,1)
@@ -322,7 +331,8 @@ end
 
 # for 
 function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf; approx="CD")
-    dW = buf
+    # print("no weight decay")
+    dW = zeros(size(rbm.W))
     # dW = pos - neg
     gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
     gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
@@ -340,14 +350,14 @@ function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf; approx="CD")
     end    
     # rbm.dW += rbm.momentum * rbm.dW_prev
     axpy!(rbm.momentum, rbm.dW_prev, dW)
-    # rbm.W += lr * dW
+    # rbm.W +=  dW
     axpy!(1.0, dW, rbm.W)
     # save current dW
     copy!(rbm.dW_prev, dW)
 end
 
 function update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_mag; approx="CD")
-    dW = buf
+    dW = zeros(size(rbm.W))
     # dW = (h_pos * v_pos') - (h_neg * v_neg')
     gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
     gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
@@ -377,7 +387,7 @@ function update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, b
 end
 
 function update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_mag ; approx="CD")
-    dW = buf
+    dW = zeros(size(rbm.W))
     # dW = (h_pos * v_pos') - (h_neg * v_neg')
     gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
     gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
@@ -409,6 +419,7 @@ end
 
 
 function contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; accelerate=false, approx="CD")
+    # print("non_persistent")
     if approx == "CD"     
         v_pos, h_pos, v_neg, h_neg = gibbs(rbm, vis; n_times=n_gibbs, accelerate=accelerate)
     else
@@ -419,6 +430,7 @@ end
 
 
 function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; accelerate=false, approx="CD")
+    # print("persistent")
     if size(rbm.persistent_chain) != size(vis)
         # persistent_chain not initialized or batch size changed, re-initialize
         rbm.persistent_chain = vis
