@@ -157,8 +157,8 @@ function score_samples(rbm::RBM, vis::Mat{Float64}; sample_size=10000)
 end
 
 
-function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf)
-    dW = buf
+function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr)
+    dW = zeros(size(rbm.W))
     # dW = (h_pos * v_pos') - (h_neg * v_neg')
     gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
     gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
@@ -170,8 +170,8 @@ function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf)
     copy!(rbm.dW_prev, dW)
 end
 
-function update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_mag)
-    dW = buf
+function update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, decay_mag)
+    dW = zeros(size(rbm.W))
     # dW = (h_pos * v_pos') - (h_neg * v_neg')
     gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
     gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
@@ -190,8 +190,8 @@ function update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, b
     copy!(rbm.dW_prev, dW)
 end
 
-function update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_mag)
-    dW = buf
+function update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, decay_mag)
+    dW = zeros(size(rbm.W))
     # dW = (h_pos * v_pos') - (h_neg * v_neg')
     gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
     gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
@@ -243,11 +243,11 @@ function fit_batch!(rbm::RBM, vis::Mat{Float64};
 
     # Gradient Update on Weights
     if weight_decay=="l2"
-        update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_magnitude)
+        update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, decay_magnitude)
     elseif weight_decay=="l1"
-        update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_magnitude)
+        update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, decay_magnitude)
     else
-        update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf)
+        update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr)
     end
 
     rbm.hbias += vec(lr * (sum(h_pos, 2) - sum(h_neg, 2)))
@@ -307,7 +307,6 @@ the user options.
     n_features = size(X, 1)
     n_samples = size(X, 2)
     n_batches = @compat Int(ceil(n_samples / batch_size))
-    w_buf = zeros(size(rbm.W))
 
     # Check for the existence of a validation set
     flag_use_validation=false
@@ -339,8 +338,8 @@ the user options.
         for i=1:n_batches
             batch = X[:, ((i-1)*batch_size + 1):min(i*batch_size, end)]
             batch = full(batch)
-            fit_batch!(rbm, batch; persistent=persistent,
-                       buf=w_buf, n_gibbs=n_gibbs,
+            fit_batch!(rbm, batch; persistent=persistent, 
+                        n_gibbs=n_gibbs,
                        weight_decay=weight_decay,decay_magnitude=decay_magnitude)
         end
         pl = mean(score_samples(rbm, X))
