@@ -12,11 +12,11 @@ function run_mnist()
     TrainSet = X[:,1:9000]
     ValidSet = X[:,9001:end]
     HiddenUnits = 256;
-    Epochs = 10;
+    Epochs = 20;
 
-    m = BernoulliRBM(28*28, HiddenUnits; momentum=0.5, dataset=TrainSet)
-    mwdQuad = BernoulliRBM(28*28, HiddenUnits; momentum=0.5 ,dataset=TrainSet)
-    mwdLin = BernoulliRBM(28*28, HiddenUnits; momentum=0.5, dataset=TrainSet)
+    m = BernoulliRBM(28*28, HiddenUnits; momentum=0.0)
+    mwdQuad = BernoulliRBM(28*28, HiddenUnits; momentum=0.0)
+    mwdLin = BernoulliRBM(28*28, HiddenUnits; momentum=0.0)
     
     # Attempt without weight decay
     info("Running Without Weight Decay")
