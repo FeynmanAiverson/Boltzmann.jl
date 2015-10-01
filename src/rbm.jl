@@ -345,7 +345,7 @@ the user options.
     info("=====================================")
 
     # Scale the learning rate by the batch size
-    lr=lr/size(batch_size,2)
+    lr=lr/batch_size
 
     for itr=1:n_iter
         for i=1:n_batches
