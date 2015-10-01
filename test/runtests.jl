@@ -7,8 +7,8 @@ include("testrbm.jl")
 info("Running Test: testmomentum.jl")
 include("testmomentum.jl")
 
-info("Running Test: testnets.jl")
-include("testnets.jl")
+# info("Running Test: testnets.jl")
+# include("testnets.jl")
 
 info("Running Test: testweightdecay.jl")
 include("testweightdecay.jl")

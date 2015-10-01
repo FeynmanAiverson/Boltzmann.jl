@@ -18,6 +18,7 @@ abstract AbstractRBM
     W::Matrix{Float64}
     vbias::Vector{Float64}
     hbias::Vector{Float64}
+    dW::Matrix{Float64}
     dW_prev::Matrix{Float64}
     persistent_chain::Matrix{Float64}
     momentum::Float64
@@ -27,24 +28,26 @@ function RBM(V::Type, H::Type,
              n_vis::Int, n_hid::Int; sigma=0.01, momentum=0.0, dataset=[])
 
     if isempty(dataset)
-        RBM{V,H}(rand(Normal(0, sigma), (n_hid, n_vis)),
-                 zeros(n_vis), 
-                 zeros(n_hid),
-                 zeros(n_hid, n_vis),
-                 Array(Float64, 0, 0),
-                 momentum)
+        RBM{V,H}(rand(Normal(0, sigma), (n_hid, n_vis)),        # W
+                 zeros(n_vis),                                  # vbias
+                 zeros(n_hid),                                  # hbias
+                 zeros(n_hid, n_vis),                           # dW
+                 zeros(n_hid, n_vis),                           # dW_prev
+                 Array(Float64, 0, 0),                          # persistent_chain
+                 momentum)                                      # momentum
     else
         ProbVis = mean(dataset,2)   # Mean across samples
         ProbVis = max(ProbVis,1e-20)
         ProbVis = min(ProbVis,1 - 1e-20)
         @devec InitVis = log(ProbVis ./ (1-ProbVis))
 
-        RBM{V,H}(rand(Normal(0, sigma), (n_hid, n_vis)),
-             vec(InitVis), 
-             zeros(n_hid),
-             zeros(n_hid, n_vis),
-             Array(Float64, 0, 0),
-             momentum)
+        RBM{V,H}(rand(Normal(0, sigma), (n_hid, n_vis)),        # W                                         
+             vec(InitVis),                                      # vbias         
+             zeros(n_hid),                                      # hbias         
+             zeros(n_hid, n_vis),                               # dW                 
+             zeros(n_hid, n_vis),                               # dW_prev                 
+             Array(Float64, 0, 0),                              # persistent_chain                 
+             momentum)                                          # momentum     
     end
 end
 
@@ -158,56 +161,59 @@ end
 
 
 function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr)
-    dW = zeros(size(rbm.W))
+    fill!(rbm.dW,0.0)
+
     # dW = (h_pos * v_pos') - (h_neg * v_neg')
-    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
-    gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
+    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, rbm.dW)
+    gemm!('N', 'T', lr, h_pos, v_pos, -1.0, rbm.dW)
     # rbm.dW += rbm.momentum * rbm.dW_prev
-    axpy!(rbm.momentum, rbm.dW_prev, dW)
+    axpy!(rbm.momentum, rbm.dW_prev, rbm.dW)
     # rbm.W += lr * dW
-    axpy!(1.0, dW, rbm.W)
+    axpy!(1.0, rbm.dW, rbm.W)
     # save current dW
-    copy!(rbm.dW_prev, dW)
+    copy!(rbm.dW_prev, rbm.dW)
 end
 
 function update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, decay_mag)
-    dW = zeros(size(rbm.W))
+    fill!(rbm.dW,0.0)
+
     # dW = (h_pos * v_pos') - (h_neg * v_neg')
-    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
-    gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
+    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, rbm.dW)
+    gemm!('N', 'T', lr, h_pos, v_pos, -1.0, rbm.dW)
 
     # rbm.W += rbm.momentum * rbm.dW_prev
-    axpy!(rbm.momentum, rbm.dW_prev, dW)
+    axpy!(rbm.momentum, rbm.dW_prev, rbm.dW)
 
     # Apply Weight-Decay Penalty
     # rbm.W += -lr * L2-Penalty-Gradient
-    axpy!(lr*decay_mag,-rbm.W,dW)
+    axpy!(lr*decay_mag,-rbm.W,rbm.dW)
 
     # rbm.W += lr * dW
-    axpy!(1.0, dW, rbm.W)
+    axpy!(1.0, rbm.dW, rbm.W)
     
     # save current dW
-    copy!(rbm.dW_prev, dW)
+    copy!(rbm.dW_prev, rbm.dW)
 end
 
 function update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, decay_mag)
-    dW = zeros(size(rbm.W))
+    fill!(rbm.dW,0.0)
+
     # dW = (h_pos * v_pos') - (h_neg * v_neg')
-    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
-    gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
+    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, rbm.dW)
+    gemm!('N', 'T', lr, h_pos, v_pos, -1.0,rbm. dW)
 
     # rbm.W += rbm.momentum * rbm.dW_prev
-    axpy!(rbm.momentum, rbm.dW_prev, dW)
+    axpy!(rbm.momentum, rbm.dW_prev, rbm.dW)
 
     # Apply Weight-Decay Penalty
     # rbm.W += -lr * L1-Penalty-Gradient
-    axpy!(lr*decay_mag,-sign(rbm.W),dW)
+    axpy!(lr*decay_mag,-sign(rbm.W),rbm.dW)
 
     # rbm.W += lr * dW
-    axpy!(1.0, dW, rbm.W)
+    axpy!(1.0, rbm.dW, rbm.W)
     
     # save current dW
-    copy!(rbm.dW_prev, dW)
+    copy!(rbm.dW_prev, rbm.dW)
 end
 
 
@@ -220,22 +226,24 @@ end
 function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int)
     if size(rbm.persistent_chain) != size(vis)
         # persistent_chain not initialized or batch size changed, re-initialize
-        rbm.persistent_chain = vis
+        rbm.persistent_chain = Array(Float64, size(vis,1), size(vis,2));
+        copy!(rbm.persistent_chain,vis)
     end
+    
     # take positive samples from real data
     v_pos, h_pos, _, _ = gibbs(rbm, vis)
     # take negative samples from "fantasy particles"
     _, _, v_neg, h_neg = gibbs(rbm, rbm.persistent_chain; n_times=n_gibbs)
-    rbm.persistent_chain = v_neg
+    
+    copy!(rbm.persistent_chain,v_neg)
+    
     return v_pos, h_pos, v_neg, h_neg
 end
 
 
 function fit_batch!(rbm::RBM, vis::Mat{Float64};
-                    persistent=true, buf=None, lr=0.1, n_gibbs=1,
+                    persistent=true, lr=0.1, n_gibbs=1,
                     weight_decay="none",decay_magnitude=0.01)
-    buf = buf == None ? zeros(size(rbm.W)) : buf
-
     sampler = persistent ? persistent_contdiv : contdiv
     v_pos, h_pos, v_neg, h_neg = sampler(rbm, vis, n_gibbs)
 
@@ -306,6 +314,7 @@ the user options.
     n_valid=0
     n_features = size(X, 1)
     n_samples = size(X, 2)
+    n_hidden = size(rbm.W,1)
     n_batches = @compat Int(ceil(n_samples / batch_size))
 
     # Check for the existence of a validation set
@@ -323,6 +332,7 @@ the user options.
     info("=====================================")
     info("  + Training Samples:   $n_samples")
     info("  + Features:           $n_features")
+    info("  + Hidden Units:       $n_hidden")
     info("  + Epochs to run:      $n_iter")
     info("  + Persistent CD?:     $persistent")
     info("  + Momentum:           $m_")
