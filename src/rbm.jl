@@ -230,15 +230,7 @@ function contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int)
 end
 
 
-function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int)
-    if size(rbm.persistent_chain) != size(vis)
-        # If the persistent chain has not been set, initialize it 
-        # to the visible samples. This should only happen for the first
-        # training batch.
-        rbm.persistent_chain = Array(Float64, size(vis,1), size(vis,2));
-        copy!(rbm.persistent_chain,vis)
-    end
-    
+function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int)    
     # take positive samples from real data
     v_pos, h_pos, _, _ = gibbs(rbm, vis; n_times=0)
     # take negative samples from "fantasy particles"
@@ -253,6 +245,7 @@ end
 function fit_batch!(rbm::RBM, vis::Mat{Float64};
                     persistent=true, lr=0.1, n_gibbs=1,
                     weight_decay="none",decay_magnitude=0.01)
+    
     sampler = persistent ? persistent_contdiv : contdiv
     v_pos, h_pos, v_neg, h_neg = sampler(rbm, vis, n_gibbs)
 
@@ -353,6 +346,14 @@ the user options.
 
     # Scale the learning rate by the batch size
     lr=lr/batch_size
+
+    # Random initialization of the persistent chain
+    # It is okay if it isn't used in the actual training procedure.
+    p = shuffle!(collect(1:n_samples))[1:batch_size]
+    rbm.persistent_chain = Array(Float64,n_features,batch_size)
+    for i=1:batch_size
+        rbm.persistent_chain[:,i] = X[:,p[i]]
+    end
 
     for itr=1:n_iter
         tic()
