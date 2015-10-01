@@ -37,8 +37,8 @@ function RBM(V::Type, H::Type,
                  momentum)                                      # momentum
     else
         ProbVis = mean(dataset,2)   # Mean across samples
-        ProbVis = max(ProbVis,1e-20)
-        ProbVis = min(ProbVis,1 - 1e-20)
+        ProbVis = max(ProbVis,1e-8)
+        ProbVis = min(ProbVis,1 - 1e-8)
         @devec InitVis = log(ProbVis ./ (1-ProbVis))
 
         RBM{V,H}(rand(Normal(0, sigma), (n_hid, n_vis)),        # W                                         
@@ -60,10 +60,10 @@ end
 
 
 typealias BernoulliRBM RBM{Bernoulli, Bernoulli}
-BernoulliRBM(n_vis::Int, n_hid::Int; sigma=0.001, momentum=0.9, dataset=[]) =
+BernoulliRBM(n_vis::Int, n_hid::Int; sigma=0.001, momentum=0.0, dataset=[]) =
     RBM(Bernoulli, Bernoulli, n_vis, n_hid; sigma=sigma, momentum=momentum, dataset=dataset)
 typealias GRBM RBM{Gaussian, Bernoulli}
-GRBM(n_vis::Int, n_hid::Int; sigma=0.001, momentum=0.9, dataset=[]) =
+GRBM(n_vis::Int, n_hid::Int; sigma=0.001, momentum=0.0, dataset=[]) =
     RBM(Gaussian, Bernoulli, n_vis, n_hid; sigma=sigma, momentum=momentum, dataset=dataset)
 
 
@@ -121,13 +121,18 @@ end
 
 function gibbs(rbm::RBM, vis::Mat{Float64}; n_times=1)
     v_pos = vis
-
     h_pos = sample_hiddens(rbm, v_pos)
-    v_neg = sample_visibles(rbm, h_pos)
-    h_neg = sample_hiddens(rbm, v_neg)
-    for i=1:n_times-1
-        v_neg = sample_visibles(rbm, h_neg)
+    h_neg = Array(Float64,0,0)::Mat{Float64}
+    v_neg = Array(Float64,0,0)::Mat{Float64}
+    if n_times > 0
+    # Save computation by setting `n_times=0` in the case
+    # of persistent CD.
+        v_neg = sample_visibles(rbm, h_pos)
         h_neg = sample_hiddens(rbm, v_neg)
+        for i=1:n_times-1
+            v_neg = sample_visibles(rbm, h_neg)
+            h_neg = sample_hiddens(rbm, v_neg)
+        end
     end
 
     return v_pos, h_pos, v_neg, h_neg
@@ -235,7 +240,7 @@ function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int)
     end
     
     # take positive samples from real data
-    v_pos, h_pos, _, _ = gibbs(rbm, vis)
+    v_pos, h_pos, _, _ = gibbs(rbm, vis; n_times=0)
     # take negative samples from "fantasy particles"
     _, _, v_neg, h_neg = gibbs(rbm, rbm.persistent_chain; n_times=n_gibbs)
     
@@ -317,6 +322,7 @@ the user options.
     n_samples = size(X, 2)
     n_hidden = size(rbm.W,1)
     n_batches = @compat Int(ceil(n_samples / batch_size))
+    N = n_hidden+n_features
 
     # Check for the existence of a validation set
     flag_use_validation=false
@@ -349,6 +355,7 @@ the user options.
     lr=lr/batch_size
 
     for itr=1:n_iter
+        tic()
         for i=1:n_batches
             batch = X[:, ((i-1)*batch_size + 1):min(i*batch_size, end)]
             batch = full(batch)
@@ -358,12 +365,13 @@ the user options.
                                    decay_magnitude=decay_magnitude,
                                    lr=lr)
         end
-        pl = mean(score_samples(rbm, X))
+        walltime=toq()/n_batches/N
+        pl = mean(score_samples(rbm, X))/N
         if flag_use_validation
-            pl_valid = mean(score_samples(rbm, validation))
-            @printf("[Epoch %04d] Train(pl : %0.3f), Valid(pl : %0.3f)\n",itr,pl,pl_valid)
+            pl_valid = mean(score_samples(rbm, validation))/N
+            @printf("[Epoch %04d] Train(pl : %0.3f), Valid(pl : %0.3f)  [%0.3f µsec/batch/unit]\n",itr,pl,pl_valid,walltime*1e6)
         else
-            @printf("[Epoch %04d] Train(pl : %0.3f)\n",itr,pl)
+            @printf("[Epoch %04d] Train(pl : %0.3f)  [%0.3f sec/batch]\n",itr,pl,walltime)
         end
     end
     return rbm
