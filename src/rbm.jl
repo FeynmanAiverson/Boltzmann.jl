@@ -260,7 +260,6 @@ function fit_batch!(rbm::RBM, vis::Mat{Float64};
 
     rbm.hbias += vec(lr * (sum(h_pos, 2) - sum(h_neg, 2)))
     rbm.vbias += vec(lr * (sum(v_pos, 2) - sum(v_neg, 2)))
-    return rbm
 end
 
 function transform(rbm::RBM, X::Mat{Float64})
