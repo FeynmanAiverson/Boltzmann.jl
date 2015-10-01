@@ -160,54 +160,56 @@ function score_samples(rbm::RBM, vis::Mat{Float64}; sample_size=10000)
 end
 
 
-function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr)
-    fill!(rbm.dW,0.0)
-
-    # dW = (h_pos * v_pos') - (h_neg * v_neg')
-    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, rbm.dW)
+function update_weights!(rbm::RBM, 
+                         h_pos::Mat{Float64}, v_pos::Mat{Float64}, 
+                         h_neg::Mat{Float64}, v_neg::Mat{Float64}, 
+                         lr::Float64)
+    # rbm.dW = lr*(h_pos * v_pos') - lr*(h_neg * v_neg')
+    gemm!('N', 'T', lr, h_neg, v_neg,  0.0, rbm.dW)          # Not flushing rbm.dW since we multiply w/ 0.0
     gemm!('N', 'T', lr, h_pos, v_pos, -1.0, rbm.dW)
     # rbm.dW += rbm.momentum * rbm.dW_prev
     axpy!(rbm.momentum, rbm.dW_prev, rbm.dW)
-    # rbm.W += lr * dW
+    # rbm.W += rbm.dW
     axpy!(1.0, rbm.dW, rbm.W)
     # save current dW
     copy!(rbm.dW_prev, rbm.dW)
 end
 
-function update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, decay_mag)
-    fill!(rbm.dW,0.0)
-
-    # dW = (h_pos * v_pos') - (h_neg * v_neg')
-    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, rbm.dW)
+function update_weights_QuadraticPenalty!(rbm::RBM, 
+                                          h_pos::Mat{Float64}, v_pos::Mat{Float64},
+                                          h_neg::Mat{Float64}, v_neg::Mat{Float64}, 
+                                          lr::Float64, decay_mag::Float64)
+    # dW = lr*(h_pos * v_pos') - lr*(h_neg * v_neg')
+    gemm!('N', 'T', lr, h_neg, v_neg,  0.0, rbm.dW)          # Not flushing rbm.dW since we multiply w/ 0.0
     gemm!('N', 'T', lr, h_pos, v_pos, -1.0, rbm.dW)
-
-    # rbm.W += rbm.momentum * rbm.dW_prev
+    # rbm.dW += rbm.momentum * rbm.dW_prev
     axpy!(rbm.momentum, rbm.dW_prev, rbm.dW)
-
+    
     # Apply Weight-Decay Penalty
     # rbm.W += -lr * L2-Penalty-Gradient
-    axpy!(lr*decay_mag,-rbm.W,rbm.dW)
+    axpy!(-lr*decay_mag,rbm.W,rbm.dW)
 
-    # rbm.W += lr * dW
+    # rbm.W +=  dW
     axpy!(1.0, rbm.dW, rbm.W)
     
     # save current dW
     copy!(rbm.dW_prev, rbm.dW)
 end
 
-function update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, decay_mag)
-    fill!(rbm.dW,0.0)
-
+function update_weights_LinearPenalty!(rbm::RBM, 
+                                       h_pos::Mat{Float64}, v_pos::Mat{Float64},
+                                       h_neg::Mat{Float64}, v_neg::Mat{Float64}, 
+                                       lr::Float64, decay_mag::Float64)
     # dW = (h_pos * v_pos') - (h_neg * v_neg')
-    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, rbm.dW)
-    gemm!('N', 'T', lr, h_pos, v_pos, -1.0,rbm. dW)
+    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, rbm.dW)          # Not flushing rbm.dW since we multiply w/ 0.0
+    gemm!('N', 'T', lr, h_pos, v_pos, -1.0,rbm.dW)
 
     # rbm.W += rbm.momentum * rbm.dW_prev
     axpy!(rbm.momentum, rbm.dW_prev, rbm.dW)
 
     # Apply Weight-Decay Penalty
     # rbm.W += -lr * L1-Penalty-Gradient
-    axpy!(lr*decay_mag,-sign(rbm.W),rbm.dW)
+    axpy!(-lr*decay_mag,sign(rbm.W),rbm.dW)
 
     # rbm.W += lr * dW
     axpy!(1.0, rbm.dW, rbm.W)
@@ -246,8 +248,6 @@ function fit_batch!(rbm::RBM, vis::Mat{Float64};
                     weight_decay="none",decay_magnitude=0.01)
     sampler = persistent ? persistent_contdiv : contdiv
     v_pos, h_pos, v_neg, h_neg = sampler(rbm, vis, n_gibbs)
-
-    lr=lr/size(v_pos,2)
 
     # Gradient Update on Weights
     if weight_decay=="l2"
@@ -344,13 +344,18 @@ the user options.
     info("  + Validation Samples: $n_valid")    
     info("=====================================")
 
+    # Scale the learning rate by the batch size
+    lr=lr/size(batch_size,2)
+
     for itr=1:n_iter
         for i=1:n_batches
             batch = X[:, ((i-1)*batch_size + 1):min(i*batch_size, end)]
             batch = full(batch)
             fit_batch!(rbm, batch; persistent=persistent, 
-                        n_gibbs=n_gibbs,
-                       weight_decay=weight_decay,decay_magnitude=decay_magnitude)
+                                   n_gibbs=n_gibbs,
+                                   weight_decay=weight_decay,
+                                   decay_magnitude=decay_magnitude,
+                                   lr=lr)
         end
         pl = mean(score_samples(rbm, X))
         if flag_use_validation
