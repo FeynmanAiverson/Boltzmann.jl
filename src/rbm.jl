@@ -227,7 +227,9 @@ end
 
 function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int)
     if size(rbm.persistent_chain) != size(vis)
-        # persistent_chain not initialized or batch size changed, re-initialize
+        # If the persistent chain has not been set, initialize it 
+        # to the visible samples. This should only happen for the first
+        # training batch.
         rbm.persistent_chain = Array(Float64, size(vis,1), size(vis,2));
         copy!(rbm.persistent_chain,vis)
     end
