@@ -258,8 +258,8 @@ function fit_batch!(rbm::RBM, vis::Mat{Float64};
         update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr)
     end
 
-    rbm.hbias += vec(lr * (sum(h_pos, 2) - sum(h_neg, 2)))
-    rbm.vbias += vec(lr * (sum(v_pos, 2) - sum(v_neg, 2)))
+    axpy!(lr,vec(sum(h_pos-h_neg,2)),rbm.hbias)
+    axpy!(lr,vec(sum(v_pos-v_neg,2)),rbm.vbias)
 end
 
 function transform(rbm::RBM, X::Mat{Float64})
