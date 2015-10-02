@@ -284,7 +284,8 @@ features(rbm::RBM; transpose=true) = components(rbm, transpose)
 
 function fit(rbm::RBM, X::Mat{Float64};
              persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1,
-             weight_decay="none",decay_magnitude=0.01,validation=[])
+             weight_decay="none",decay_magnitude=0.01,validation=[],
+             score_every=5)
 #=
 The core RBM training function. Learns the weights and biasings using 
 either standard Contrastive Divergence (CD) or Persistent CD, depending on
@@ -296,17 +297,21 @@ the user options.
 
 ### Optional Inputs
  - *persistent:* Whether or not to use persistent-CD [default=true]
+ - *lr:* Learning rate [default=0.1]
  - *n_iter:* Number of training epochs [default=10]
  - *batch_size:* Minibatch size [default=100]
  - *n_gibbs:* Number of Gibbs sampling steps on the Markov Chain [default=1]
  - *weight_decay:* A string value representing the regularization to add to apply to the 
-                   weight magnitude during training {"none","l1","l2"}/ [default="none"]
+                   weight magnitude during training {"none","l1","l2"}. [default="none"]
  - *decay_magnitude:* Relative importance assigned to the weight regularization. Smaller
                       values represent less regularization. Should be in range (0,1). 
                       [default=0.01]
  - *validation:* An array of validation samples, e.g. a held out set of training data.
                  If passed, `fit` will also track generalization progress during training.
                  [default=empty-set]
+ - *score_every:* Controls at which epoch the progress of the fit is monitored. Useful to 
+                  speed up the fit procedure if detailed progress monitoring is not required.
+                  [default=5]
 =#
     @assert minimum(X) >= 0 && maximum(X) <= 1
 
@@ -367,12 +372,14 @@ the user options.
                                    lr=lr)
         end
         walltime=toq()/n_batches/N
-        pl = mean(score_samples(rbm, X))/N
-        if flag_use_validation
-            pl_valid = mean(score_samples(rbm, validation))/N
-            @printf("[Epoch %04d] Train(pl : %0.3f), Valid(pl : %0.3f)  [%0.3f µsec/batch/unit]\n",itr,pl,pl_valid,walltime*1e6)
-        else
-            @printf("[Epoch %04d] Train(pl : %0.3f)  [%0.3f sec/batch]\n",itr,pl,walltime)
+        if mod(itr,score_every) == 0
+            pl = mean(score_samples(rbm, X))/N
+            if flag_use_validation
+                pl_valid = mean(score_samples(rbm, validation))/N
+                @printf("[Epoch %04d] Train(pl : %0.3f), Valid(pl : %0.3f)  [%0.3f µsec/batch/unit]\n",itr,pl,pl_valid,walltime*1e6)
+            else
+                @printf("[Epoch %04d] Train(pl : %0.3f)  [%0.3f µsec/batch]\n",itr,pl,walltime*1e6)
+            end
         end
     end
     return rbm
