@@ -111,7 +111,7 @@ end
     
 function sample_hiddens{V,H}(rbm::RBM{V, H}, vis::Mat{Float64})
     means = hid_means(rbm, vis)
-    return sample(H, means)
+    return sample(H, means), means
 end
 
 function sample_visibles{V,H}(rbm::RBM{V,H}, hid::Mat{Float64})
@@ -121,20 +121,18 @@ end
 
 function gibbs(rbm::RBM, vis::Mat{Float64}; n_times=1)
     v_pos = vis
-    h_pos = sample_hiddens(rbm, v_pos)
+    h_samp, h_pos = sample_hiddens(rbm, v_pos)
     h_neg = Array(Float64,0,0)::Mat{Float64}
     v_neg = Array(Float64,0,0)::Mat{Float64}
     if n_times > 0
     # Save computation by setting `n_times=0` in the case
     # of persistent CD.
-        v_neg = sample_visibles(rbm, h_pos)
-        h_neg = sample_hiddens(rbm, v_neg)
+        v_neg = sample_visibles(rbm, h_samp)
+        h_samp, h_neg = sample_hiddens(rbm, v_neg)
         for i=1:n_times-1
-            v_neg = sample_visibles(rbm, h_neg)
+            v_neg = sample_visibles(rbm, h_samp)
             h_neg = sample_hiddens(rbm, v_neg)
         end
-        h_pos = hid_means(rbm,v_pos)
-        h_neg = hid_means(rbm,v_neg)
     end
 
     return v_pos, h_pos, v_neg, h_neg
