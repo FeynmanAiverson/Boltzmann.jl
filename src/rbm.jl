@@ -20,7 +20,8 @@ abstract AbstractRBM
     vbias::Vector{Float64}
     hbias::Vector{Float64}
     dW_prev::Matrix{Float64}
-    persistent_chain::Matrix{Float64}
+    persistent_chain_vis::Matrix{Float64}
+    persistent_chain_hid::Matrix{Float64}
     momentum::Float64
 end
 
@@ -33,6 +34,7 @@ function RBM(V::Type, H::Type,
                  zeros(n_hid),
                  zeros(n_hid, n_vis),
                  Array(Float64, 0, 0),
+                 Array(Float64, 0, 0),
                  momentum)
     else
         ProbVis = mean(dataset,2)   # Mean across samples
@@ -44,6 +46,7 @@ function RBM(V::Type, H::Type,
              vec(InitVis), 
              zeros(n_hid),
              zeros(n_hid, n_vis),
+             Array(Float64, 0, 0),
              Array(Float64, 0, 0),
              momentum)
     end
@@ -261,12 +264,15 @@ function gibbs(rbm::RBM, vis::Mat{Float64}; n_times=1, accelerate=false)
             h_neg = sample_hiddens(rbm, v_neg)
         end
     end
+    h_pos=hid_means(rbm,v_pos)
+    h_neg=hid_means(rbm,v_neg)
     return v_pos, h_pos, v_neg, h_neg
 end
 
-function iter_mag(rbm::RBM, vis::Mat{Float64}; n_times=1, approx="tap2")
+function iter_mag(rbm::RBM, vis::Mat{Float64}; n_times=3, approx="tap2")
     v_pos = vis
     h_pos = hid_means(rbm, v_pos)
+
     if approx == "naive"
         mag_vis = mag_vis_naive
         mag_hid = mag_hid_naive
@@ -286,6 +292,35 @@ function iter_mag(rbm::RBM, vis::Mat{Float64}; n_times=1, approx="tap2")
     end
     return v_pos, h_pos, m_vis, m_hid
 end    
+
+function iter_mag_persist!(rbm::RBM, vis::Mat{Float64}; n_times=3, approx="tap2")
+    v_pos = vis
+    h_pos = hid_means(rbm, v_pos)
+    
+    if approx == "naive"
+        mag_vis = mag_vis_naive
+        mag_hid = mag_hid_naive
+    elseif approx == "tap3"
+        mag_vis = mag_vis_tap3
+        mag_hid = mag_hid_tap3
+    else    
+        mag_vis = mag_vis_tap2
+        mag_hid = mag_hid_tap2
+    end    
+
+    m_vis = rbm.persistent_chain_vis
+    m_hid = rbm.persistent_chain_hid
+
+    for i=1:n_times
+       m_vis = 0.5 * mag_vis(rbm, m_vis, m_hid) + 0.5 * m_vis
+       m_hid = 0.5 * mag_hid(rbm, m_vis, m_hid) + 0.5 * m_hid
+    end
+
+    rbm.persistent_chain_vis = m_vis
+    rbm.persistent_chain_hid = m_hid
+
+    return v_pos, h_pos, m_vis, m_hid
+end 
 
 
 function free_energy(rbm::RBM, vis::Mat{Float64})
@@ -315,11 +350,12 @@ end
 
 function score_samples_TAP(rbm::RBM, vis::Mat{Float64}; n_iter=5)
     _, _, m_vis, m_hid = iter_mag(rbm, vis; n_times=n_iter, approx="tap2")
+    eps=1e-6
 
-    m_vis = max(m_vis, 1e-20)
-    m_vis = min(m_vis, 1.0-1e-20)
-    m_hid = max(m_hid, 1e-20)
-    m_hid = min(m_hid, 1.0-1e-20)
+    m_vis = max(m_vis, eps)
+    m_vis = min(m_vis, 1.0-eps)
+    m_hid = max(m_hid, eps)
+    m_hid = min(m_hid, 1.0-eps)
 
     S = - sum(m_vis.*log(m_vis)+(1.0-m_vis).*log(1.0-m_vis),1) - sum(m_hid.*log(m_hid)+(1.0-m_hid).*log(1.0-m_hid),1)
     U_naive = - gemv('T',m_vis,rbm.vbias)' - gemv('T',m_hid,rbm.hbias)' - sum(gemm('N','N',rbm.W,m_vis).*m_hid,1)
@@ -431,21 +467,22 @@ end
 
 function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; accelerate=false, approx="CD")
     # print("persistent")
-    if size(rbm.persistent_chain) != size(vis)
+    if size(rbm.persistent_chain_vis) != size(vis)
         # persistent_chain not initialized or batch size changed, re-initialize
-        rbm.persistent_chain = vis
+        rbm.persistent_chain_vis = vis
+        rbm.persistent_chain_hid = hid_means(rbm, vis)
     end
 
     if approx == "CD"
         # take positive samples from real data
         v_pos, h_pos, _, _ = gibbs(rbm, vis; accelerate=accelerate)
         # take negative samples from "fantasy particles"
-        _, _, v_neg, h_neg = gibbs(rbm, rbm.persistent_chain; n_times=n_gibbs,accelerate=accelerate)
-        rbm.persistent_chain = v_neg
+        _, _, v_neg, h_neg = gibbs(rbm, rbm.persistent_chain_vis; n_times=n_gibbs,accelerate=accelerate)
+        rbm.persistent_chain_vis = v_neg
     else
-        v_pos, h_pos, _, _ = iter_mag(rbm, vis; n_times=n_gibbs, approx=approx)
-        _, _, v_neg, h_neg = iter_mag(rbm, rbm.persistent_chain; n_times=n_gibbs, approx=approx)
-        rbm.persistent_chain = v_neg
+        v_pos, h_pos, v_neg, h_neg = iter_mag_persist!(rbm, vis; n_times=n_gibbs, approx=approx)
+        # rbm.persistent_chain_vis = v_neg
+        # rbm.persistent_chain_hid = h_neg
 
     end    
     return v_pos, h_pos, v_neg, h_neg
@@ -460,7 +497,7 @@ function fit_batch!(rbm::RBM, vis::Mat{Float64};
     sampler = persistent ? persistent_contdiv : contdiv
     v_pos, h_pos, v_neg, h_neg = sampler(rbm, vis, n_gibbs; accelerate=accelerate, approx=approx)
 
-    lr=lr/size(v_pos,2)
+    # lr=lr/size(v_pos,2)
 
     # Gradient Update on Weights
     if weight_decay=="l2"
@@ -473,8 +510,68 @@ function fit_batch!(rbm::RBM, vis::Mat{Float64};
 
     rbm.hbias += vec(lr * (sum(h_pos, 2) - sum(h_neg, 2)))
     rbm.vbias += vec(lr * (sum(v_pos, 2) - sum(v_neg, 2)))
+    
     return rbm
 end
+
+# function fit_batch_tap2!(rbm::RBM, vis::Mat{Float64};
+#                     persistent=true, buf=None, lr=0.1, n_gibbs=1,accelerate=false,
+#                     weight_decay="none",decay_mag=0.01, approx="CD")
+#     buf = buf == None ? zeros(size(rbm.W)) : buf
+
+#     if size(rbm.persistent_chain_vis) != size(vis)
+#         # persistent_chain not initialized or batch size changed, re-initialize
+#         rbm.persistent_chain_vis = vis
+#         rbm.persistent_chain_hid = hid_means(rbm,vis)
+#     end
+
+#     v_pos = vis
+#     h_pos = hid_means(rbm, v_pos)
+
+#     v_neg = rbm.persistent_chain_vis
+#     h_neg = rbm.persistent_chain_hid
+
+#     for i=1:n_gibbs
+#        v_neg = 0.5 * mag_vis_tap2(rbm, v_neg, h_neg) + 0.5 * v_neg
+#        h_neg = 0.5 * mag_hid_tap2(rbm, v_neg, h_neg) + 0.5 * h_neg
+#     end
+
+#     rbm.persistent_chain_vis=v_neg
+#     rbm.persistent_chain_hid=h_neg
+
+
+#     # dW = (h_pos * v_pos') - (h_neg * v_neg')
+#     dW = zeros(size(rbm.W))
+#     # dW = (h_pos * v_pos') - (h_neg * v_neg')
+#     gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
+#     gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
+
+
+#     buf2 = gemm('N', 'T', h_neg-h_neg.^2, v_neg-v_neg.^2) .* rbm.W  
+#     axpy!(-lr, buf2, dW)
+#         #println("second order term  ",sum(buf2)/(size(dW,1)*size(dW,2)))
+
+ 
+#     # rbm.W += rbm.momentum * rbm.dW_prev
+#     axpy!(rbm.momentum, rbm.dW_prev, dW)
+
+#     # Apply Weight-Decay Penalty
+#     # rbm.W += -lr * L2-Penalty-Gradient
+#     axpy!(lr*decay_mag,-rbm.W,dW)
+
+#     # rbm.W += lr * dW
+#     axpy!(1.0, dW, rbm.W)
+    
+#     # save current dW
+#     copy!(rbm.dW_prev, dW)
+
+#     # save current dW
+#     #copy!(rbm.dW_prev, dW)
+
+#     rbm.hbias += vec(lr * (sum(h_pos, 2) - sum(h_neg, 2)))
+#     rbm.vbias += vec(lr * (sum(v_pos, 2) - sum(v_neg, 2)))
+#     return rbm
+# end
 
 function transform(rbm::RBM, X::Mat{Float64})
     return hid_means(rbm, X)
@@ -529,6 +626,9 @@ the user options.
     n_samples = size(X, 2)
     n_batches = @compat Int(ceil(n_samples / batch_size))
     w_buf = zeros(size(rbm.W))
+
+    lr=lr/batch_size
+
     pseudo_likelihood = zeros(n_iter,1)
     tap_likelihood = zeros(n_iter,1)
     for itr=1:n_iter
@@ -538,11 +638,11 @@ the user options.
             batch = full(batch)
             fit_batch!(rbm, batch, persistent=persistent,
                        buf=w_buf, n_gibbs=n_gibbs, accelerate=accelerate;
-                       weight_decay=weight_decay, decay_magnitude=decay_magnitude, approx=approx)
+                       weight_decay=weight_decay, decay_magnitude=decay_magnitude, approx=approx, lr=lr)
         end
         # toc()
-        pseudo = mean(score_samples(rbm, X))
-        tap = mean(score_samples_TAP(rbm, X))
+        pseudo = mean(score_samples(rbm, X))/(size(rbm.W)[1]+size(rbm.W)[2])
+        tap = mean(score_samples_TAP(rbm, X))/(size(rbm.W)[1]+size(rbm.W)[2])
         println("Iteration #$itr, pseudo-likelihood = $pseudo, tap-likelihood = $tap")
         pseudo_likelihood[itr] = pseudo
         tap_likelihood[itr] = tap
@@ -550,3 +650,61 @@ the user options.
     end
     return rbm, pseudo_likelihood, tap_likelihood
 end
+
+# function fit_tap2(rbm::RBM, X::Mat{Float64};
+#              persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1,accelerate=false,
+#              weight_decay="none",decay_magnitude=0.01, approx="CD")
+
+# The core RBM training function. Learns the weights and biasings using 
+# either standard Contrastive Divergence (CD) or Persistent CD, depending on
+# the user options. 
+
+# ### Required Inputs
+# - *rbm:* RBM object, initialized by `RBM()`/`GRBM()`
+# - *X:* Set of training vectors
+
+# ### Optional Inputs
+#  - *persistent:* Whether or not to use persistent-CD [default=true]
+#  - *n_iter:* Number of training epochs [default=10]
+#  - *batch_size:* Minibatch size [default=100]
+#  - *n_gibbs:* Number of Gibbs sampling steps on the Markov Chain [default=1]
+#  - *accelerate:* Flag controlling whether or not to use Apple's Accelerate framework
+#                  to speed up some computations. Unused on non-OSX systems. [default=true]
+#  - *weight_decay:* A string value representing the regularization to add to apply to the 
+#                    weight magnitude during training {"none","l1","l2"}/ [default="none"]
+#  - *decay_magnitude:* Relative importance assigned to the weight regularization. Smaller
+#                       values represent less regularization. Should be in range (0,1). 
+#                       [default=0.01]
+
+#     @assert minimum(X) >= 0 && maximum(X) <= 1
+
+#     # Check OS and deny AppleAccelerate to non-OSX systems
+#     accelerate = @osx? accelerate : false
+
+#     n_samples = size(X, 2)
+#     n_batches = @compat Int(ceil(n_samples / batch_size))
+#     w_buf = zeros(size(rbm.W))
+
+#     lr=lr/batch_size
+
+#     pseudo_likelihood = zeros(n_iter,1)
+#     tap_likelihood = zeros(n_iter,1)
+#     for itr=1:n_iter
+#         # tic()
+#         for i=1:n_batches
+#             batch = X[:, ((i-1)*batch_size + 1):min(i*batch_size, end)]
+#             batch = full(batch)
+#             fit_batch_tap2!(rbm, batch, persistent=persistent,
+#                        buf=w_buf, n_gibbs=n_gibbs, accelerate=accelerate;
+#                        weight_decay=weight_decay, decay_mag=decay_magnitude, approx=approx, lr=lr)
+#         end
+#         # toc()
+#         pseudo = mean(score_samples(rbm, X))/(size(rbm.W)[1]+size(rbm.W)[2])
+#         tap = mean(score_samples_TAP(rbm, X))/(size(rbm.W)[1]+size(rbm.W)[2])
+#         println("Iteration #$itr, pseudo-likelihood = $pseudo, tap-likelihood = $tap")
+#         pseudo_likelihood[itr] = pseudo
+#         tap_likelihood[itr] = tap
+
+#     end
+#     return rbm, pseudo_likelihood, tap_likelihood
+# end
