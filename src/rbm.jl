@@ -133,6 +133,8 @@ function gibbs(rbm::RBM, vis::Mat{Float64}; n_times=1)
             v_neg = sample_visibles(rbm, h_neg)
             h_neg = sample_hiddens(rbm, v_neg)
         end
+        h_pos = hid_means(rbm,v_pos)
+        h_neg = hid_means(rbm,v_neg)
     end
 
     return v_pos, h_pos, v_neg, h_neg
