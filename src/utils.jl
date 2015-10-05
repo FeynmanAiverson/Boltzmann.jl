@@ -14,15 +14,30 @@ macro runonce(expr)
     end)
 end
 
-function normalize(x)
-    minx = minimum(x)
-    maxx = maximum(x)
-    ranx = maxx-minx
+function normalize_samples(X)
+    samples = size(X,2)
 
-    @simd for i=1:length(x)
-      @inbounds x[i] = (x[i]-minx) / ranx
+    for i=1:samples
+      x = X[:,i]
+      minx = minimum(x)
+      maxx = maximum(x)
+      ranx = maxx-minx
+      X[:,i] = (x-minx)/ranx
     end
-    return x
+
+    return X
+end
+
+function normalize_samples!(X)
+    samples = size(X,2)
+
+    for i=1:samples
+      x = X[:,i]
+      minx = minimum(x)
+      maxx = maximum(x)
+      ranx = maxx-minx
+      X[:,i] = (x-minx)/ranx
+    end
 end
 
 function normalize!(x)
@@ -33,6 +48,18 @@ function normalize!(x)
     @simd for i=1:length(x)
       @inbounds x[i] = (x[i]-minx) / ranx
     end
+end
+
+function normalize(x)
+    minx = minimum(x)
+    maxx = maximum(x)
+    ranx = maxx-minx
+
+    @simd for i=1:length(x)
+      @inbounds x[i] = (x[i]-minx) / ranx
+    end
+
+    return x
 end
 
 function binarize!(x;level=0.001)

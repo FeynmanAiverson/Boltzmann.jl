@@ -20,7 +20,9 @@ export RBM,
        binarize,
        binarize!,
        normalize,
-       normalize!
+       normalize!,
+       normalize_samples,
+       normalize_samples!
 
 include("core.jl")
 

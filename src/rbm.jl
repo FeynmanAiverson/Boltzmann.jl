@@ -346,7 +346,7 @@ the user options.
     info("  + Weight Decay?:      $weight_decay") 
     info("  + Weight Decay Mag.:  $decay_magnitude")
     info("  + Validation Set?:    $flag_use_validation")    
-    info("  + Validation Samples: $n_valid")    
+    info("  + Validation Samples: $n_valid")   
     info("=====================================")
 
     # Scale the learning rate by the batch size
