@@ -22,7 +22,9 @@ export RBM,
        normalize,
        normalize!,
        normalize_samples,
-       normalize_samples!
+       normalize_samples!,
+       removemean,
+       removemean!
 
 include("core.jl")
 

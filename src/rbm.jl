@@ -22,32 +22,51 @@ abstract AbstractRBM
     dW_prev::Matrix{Float64}
     persistent_chain::Matrix{Float64}
     momentum::Float64
+    HidDist::AbstractString
+    VisDist::AbstractString
+    VisVariance::Vector{Float64}
+    VisMean::Vector{Float64}
+    HidVariance::Vector{Float64}
+    HidMean::Vector{Float64}
 end
 
-function RBM(V::Type, H::Type,
-             n_vis::Int, n_hid::Int; sigma=0.01, momentum=0.0, dataset=[])
+function RBM(V::Type, H::Type, n_vis::Int, n_hid::Int; 
+             momentum=0.0, dataset=[],
+             VisVariance=ones(n_vis),
+             VisMeans=zeros(n_vis),
+             HidVariance=ones(n_hid),
+             HidMeans=zeros(n_hid))
+    InitWStdDev = 0.01
 
-    if isempty(dataset)
-        RBM{V,H}(rand(Normal(0, sigma), (n_hid, n_vis)),        # W
-                 zeros(n_vis),                                  # vbias
-                 zeros(n_hid),                                  # hbias
-                 zeros(n_hid, n_vis),                           # dW
-                 zeros(n_hid, n_vis),                           # dW_prev
-                 Array(Float64, 0, 0),                          # persistent_chain
-                 momentum)                                      # momentum
-    else
-        ProbVis = mean(dataset,2)   # Mean across samples
-        ProbVis = max(ProbVis,1e-8)
-        ProbVis = min(ProbVis,1 - 1e-8)
+    # Check for RBM type
+    vtype = @sprintf("%s",typeof(V()))
+    htype = @sprintf("%s",typeof(H()))
+
+    # Make assignments
+    RBM{V,H}(rand(Normal(0,InitWStdDev), (n_hid, n_vis)),   # W
+             zeros(n_vis),                                  # vbias
+             zeros(n_hid),                                  # hbias
+             zeros(n_hid, n_vis),                           # dW
+             zeros(n_hid, n_vis),                           # dW_prev
+             Array(Float64, 0, 0),                          # persistent_chain
+             momentum,                                      # momentum
+             htype,                                         # Hidden distribution
+             vtype,                                         # Visible distribution
+             VisVariance,                                   # Visible unit variance (For Gaus. visible) 
+             VisMeans,                                      # Visible unit mean (For Gaus. visible)
+             HidVariance,                                   # Hidden unit variance (For Gaus. hidden)
+             HidMeans)                                      # Hidden unit mean (For Gaus. hidden)
+
+
+    # If the user passes a dataset for initialization...
+    if !isempty(dataset)
+        eps = 1e-8
+        ProbVis = mean(dataset,2)
+        ProbVis = max(ProbVis,eps)
+        ProbVis = min(ProbVis,1-eps)
         @devec InitVis = log(ProbVis ./ (1-ProbVis))
 
-        RBM{V,H}(rand(Normal(0, sigma), (n_hid, n_vis)),        # W                                         
-             vec(InitVis),                                      # vbias         
-             zeros(n_hid),                                      # hbias         
-             zeros(n_hid, n_vis),                               # dW                 
-             zeros(n_hid, n_vis),                               # dW_prev                 
-             Array(Float64, 0, 0),                              # persistent_chain                 
-             momentum)                                          # momentum     
+        rbm.vbias = vec(InitVis)
     end
 end
 
@@ -60,11 +79,14 @@ end
 
 
 typealias BernoulliRBM RBM{Bernoulli, Bernoulli}
-BernoulliRBM(n_vis::Int, n_hid::Int; sigma=0.01, momentum=0.0, dataset=[]) =
-    RBM(Bernoulli, Bernoulli, n_vis, n_hid; sigma=sigma, momentum=momentum, dataset=dataset)
+BernoulliRBM(n_vis::Int, n_hid::Int; momentum=0.0, dataset=[]) =
+    RBM(Bernoulli, Bernoulli, n_vis, n_hid; 
+        momentum=momentum, dataset=dataset)
 typealias GRBM RBM{Gaussian, Bernoulli}
-GRBM(n_vis::Int, n_hid::Int; sigma=0.01, momentum=0.0, dataset=[]) =
-    RBM(Gaussian, Bernoulli, n_vis, n_hid; sigma=sigma, momentum=momentum, dataset=dataset)
+GRBM(n_vis::Int, n_hid::Int; momentum=0.0, dataset=[],
+                             VisVariance=ones(n_vis),
+                             VisMeans=zeros(n_vis)) =
+    RBM(Gaussian, Bernoulli, n_vis, n_hid; momentum=momentum, dataset=dataset,VisVariance=VisVariance,VisMeans=VisMeans)
 
 
 ### Base Definitions
@@ -275,7 +297,6 @@ function generate(rbm::RBM, X::Mat{Float64}; n_gibbs=1)
     return gibbs(rbm, X; n_times=n_gibbs)[3]
 end
 
-
 function components(rbm::RBM; transpose=true)
     return if transpose rbm.W' else rbm.W end
 end
@@ -313,7 +334,11 @@ the user options.
                   speed up the fit procedure if detailed progress monitoring is not required.
                   [default=5]
 =#
-    @assert minimum(X) >= 0 && maximum(X) <= 1
+    
+    # Check to see what kind of RBM
+    if rbm.VisDist=="Distributions.Bernoulli"
+      @assert minimum(X) >= 0 && maximum(X) <= 1  
+    end
 
     n_valid=0
     n_features = size(X, 1)

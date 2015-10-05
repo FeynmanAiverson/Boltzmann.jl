@@ -10,11 +10,14 @@
 # info("Running Test: testnets.jl")
 # include("testnets.jl")
 
-info("Running Test: testweightdecay.jl")
-include("testweightdecay.jl")
+# info("Running Test: testweightdecay.jl")
+# include("testweightdecay.jl")
 
 # info("Running Test: testgaussianrbm.jl")
 # include("testgaussianrbm.jl")
 
 # info("Running Test: testvalidation.jl")
 # include("testvalidation.jl")
+
+info("Running Test: testcifar.jl")
+include("testcifar.jl")

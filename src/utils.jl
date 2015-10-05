@@ -74,3 +74,17 @@ function binarize(x;level=0.001)
   end
   return x
 end
+
+function removemean(x;dim=2)
+  println(x)
+  m = mean(x,dim)
+  println(m)
+  y = x .- m
+  println(y)
+  return y
+end
+
+function removemean!(x::Array{Float64};dim=2)
+  m = mean(x,dim)
+  x = x .- m
+end
