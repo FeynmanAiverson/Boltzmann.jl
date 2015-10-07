@@ -26,7 +26,7 @@ abstract AbstractRBM
 end
 
 function RBM(V::Type, H::Type,
-             n_vis::Int, n_hid::Int; sigma=0.01, momentum=0.5, dataset=[])
+             n_vis::Int, n_hid::Int; sigma=0.1, momentum=0.5, dataset=[])
 
     if isempty(dataset)
         RBM{V,H}(rand(Normal(0, sigma), (n_hid, n_vis)),
@@ -61,10 +61,10 @@ end
 
 
 typealias BernoulliRBM RBM{Bernoulli, Bernoulli}
-BernoulliRBM(n_vis::Int, n_hid::Int; sigma=0.001, momentum=0.9, dataset=[]) =
+BernoulliRBM(n_vis::Int, n_hid::Int; sigma=0.1, momentum=0.9, dataset=[]) =
     RBM(Bernoulli, Bernoulli, n_vis, n_hid; sigma=sigma, momentum=momentum, dataset=dataset)
 typealias GRBM RBM{Gaussian, Bernoulli}
-GRBM(n_vis::Int, n_hid::Int; sigma=0.001, momentum=0.9, dataset=[]) =
+GRBM(n_vis::Int, n_hid::Int; sigma=0.1, momentum=0.9, dataset=[]) =
     RBM(Gaussian, Bernoulli, n_vis, n_hid; sigma=sigma, momentum=momentum, dataset=dataset)
 
 
@@ -510,7 +510,7 @@ function fit_batch!(rbm::RBM, vis::Mat{Float64};
 
     rbm.hbias += vec(lr * (sum(h_pos, 2) - sum(h_neg, 2)))
     rbm.vbias += vec(lr * (sum(v_pos, 2) - sum(v_neg, 2)))
-    
+
     return rbm
 end
 
