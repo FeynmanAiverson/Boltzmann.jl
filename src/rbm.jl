@@ -17,6 +17,8 @@ abstract AbstractRBM
 
 @runonce type RBM{V,H} <: AbstractRBM
     W::Matrix{Float64}
+    W2::Matrix{Float64}
+    W3::Matrix{Float64}
     vbias::Vector{Float64}
     hbias::Vector{Float64}
     dW_prev::Matrix{Float64}
@@ -30,6 +32,8 @@ function RBM(V::Type, H::Type,
 
     if isempty(dataset)
         RBM{V,H}(rand(Normal(0, sigma), (n_hid, n_vis)),
+                 zeros(n_hid,n_vis),
+                 zeros(n_hid,n_vis),
                  zeros(n_vis), 
                  zeros(n_hid),
                  zeros(n_hid, n_vis),
@@ -43,6 +47,8 @@ function RBM(V::Type, H::Type,
         @devec InitVis = log(ProbVis ./ (1-ProbVis))
 
         RBM{V,H}(rand(Normal(0, sigma), (n_hid, n_vis)),
+             zeros(n_hid,n_vis),
+             zeros(n_hid,n_vis),
              vec(InitVis), 
              zeros(n_hid),
              zeros(n_hid, n_vis),
@@ -131,8 +137,8 @@ function mag_vis_naive(rbm::RBM, m_hid::Mat{Float64}) ## to be constrained to be
     buf = gemm('T', 'N', rbm.W, m_hid) .+ rbm.vbias
     return logistic(buf)
 end    
-
-mag_vis_naive(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64})=mag_vis_naive(rbm, m_hid) # Defining a method with same arguments as other mean field approxiamtions
+# Defining a method with same arguments as other mean field approxiamtions
+mag_vis_naive(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64})=mag_vis_naive(rbm, m_hid) 
 
 function mag_hid_naive(rbm::RBM, m_vis::Mat{Float64}) 
     # buf = rbm.W*m_vis.+rbm.hbias
@@ -143,7 +149,7 @@ function mag_hid_naive(rbm::RBM, m_vis::Mat{Float64})
     return logistic(buf)
 end    
 
-mag_hid_naive(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64})=mag_hid_naive(rbm, m_vis) # Defining a method with same arguments as other mean field approxiamtio
+mag_hid_naive(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64})=mag_hid_naive(rbm, m_vis) 
   
 #### Second order development
 
@@ -155,14 +161,14 @@ function mag_vis_tap2(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64}) ## to 
     # gemm!('T', 'N', rbm.W, m_hid, 1.0, buf)
     buf = gemm('T', 'N', rbm.W, m_hid) .+ rbm.vbias
     # \sum_j w_ij(m_j-m_jˆ2)(0.5-m_i)
-    second_order = gemm('T', 'N', rbm.W.^2, m_hid-m_hid.^2).*(0.5-m_vis)
+    second_order = gemm('T', 'N', rbm.W2, m_hid-abs2(m_hid)).*(0.5-m_vis)
     axpy!(1.0, second_order, buf)
     return logistic(buf)
 end  
 
 function mag_hid_tap2(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64})
     buf = gemm('N', 'N', rbm.W, m_vis) .+ rbm.hbias
-    second_order = gemm('N', 'N', rbm.W.^2, m_vis-m_vis.^2).*(0.5-m_hid)
+    second_order = gemm('N', 'N', rbm.W2, m_vis-abs2(m_vis)).*(0.5-m_hid)
     axpy!(1.0, second_order, buf)
     return logistic(buf)
 end
@@ -174,9 +180,9 @@ function mag_vis_tap3(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64}) ## to 
     # buf = rbm.W'*m_hid+rbm.vbias
     buf = gemm('T', 'N', rbm.W, m_hid) .+ rbm.vbias
     # \sum_j w_ijˆ2(m_j-m_jˆ2)(0.5-m_i)
-    second_order = gemm('T', 'N', rbm.W.^2, m_hid-m_hid.^2).*(0.5-m_vis)
+    second_order = gemm('T', 'N', rbm.W2, m_hid-abs2(m_hid)).*(0.5-m_vis)
     # \sum_j w_ijˆ3(1/3-2(m_i-m-iˆ2))(m_jˆ2-m_jˆ3)
-    third_order = gemm('T', 'N', rbm.W.^3, m_hid.^2-m_hid.^3).*(1/3-2*(m_vis-m_vis.^2))
+    third_order = gemm('T', 'N', rbm.W3, abs2(m_hid).*(1.-m_hid)).*(1/3-2*(m_vis-abs2(m_vis)))
     axpy!(1.0, second_order, buf)
     axpy!(1.0, third_order, buf)
     return logistic(buf)
@@ -184,8 +190,8 @@ end
 
 function mag_hid_tap3(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64})
     buf = gemm('N', 'N', rbm.W, m_vis) .+ rbm.hbias
-    second_order = gemm('N', 'N', rbm.W.^2, m_vis-m_vis.^2).*(0.5-m_hid)
-    third_order = gemm('N', 'N', rbm.W.^3, m_vis.^2-m_vis.^3).*(1/3-2*(m_hid-m_hid.^2))
+    second_order = gemm('N', 'N', rbm.W2, m_vis-abs2(m_vis)).*(0.5-m_hid)
+    third_order = gemm('N', 'N', rbm.W3, abs2(m_vis).*(1.-m_vis)).*(1/3-2*(m_hid-abs2(m_hid)))
     axpy!(1.0, second_order, buf)
     axpy!(1.0, third_order, buf)
     return logistic(buf)
@@ -290,6 +296,7 @@ function iter_mag(rbm::RBM, vis::Mat{Float64}; n_times=3, approx="tap2")
        m_vis = 0.5 * mag_vis(rbm, m_vis, m_hid) + 0.5 * m_vis
        m_hid = 0.5 * mag_hid(rbm, m_vis, m_hid) + 0.5 * m_hid
     end
+
     return v_pos, h_pos, m_vis, m_hid
 end    
 
@@ -359,7 +366,7 @@ function score_samples_TAP(rbm::RBM, vis::Mat{Float64}; n_iter=5)
 
     S = - sum(m_vis.*log(m_vis)+(1.0-m_vis).*log(1.0-m_vis),1) - sum(m_hid.*log(m_hid)+(1.0-m_hid).*log(1.0-m_hid),1)
     U_naive = - gemv('T',m_vis,rbm.vbias)' - gemv('T',m_hid,rbm.hbias)' - sum(gemm('N','N',rbm.W,m_vis).*m_hid,1)
-    Onsager = - 0.5 * sum(gemm('N','N',rbm.W.^2,m_vis-m_vis.^2).*(m_hid-m_hid.^2),1)    
+    Onsager = - 0.5 * sum(gemm('N','N',rbm.W2,m_vis-abs2(m_vis)).*(m_hid-abs2(m_hid)),1)    
     fe_tap = U_naive + Onsager - S
     fe = free_energy(rbm, vis)
     return fe_tap - fe
@@ -375,12 +382,12 @@ function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf; approx="CD")
 
     #println("first order term   ",sum(dW)/(size(dW,1)*size(dW,2)))
     if contains(approx,"tap") 
-        buf2 = gemm('N', 'T', h_neg-h_neg.^2, v_neg-v_neg.^2) .* rbm.W  
+        buf2 = gemm('N', 'T', h_neg-abs2(h_neg), v_neg-abs2(v_neg)) .* rbm.W  
         axpy!(-lr, buf2, dW)
         #println("second order term  ",sum(buf2)/(size(dW,1)*size(dW,2)))
     end
     if approx == "tap3"
-        buf3 = gemm('N','T', (h_neg-h_neg.^2) .* (0.5-h_neg), (v_neg-v_neg.^2) .* (0.5-v_neg)) .* rbm.W.^2
+        buf3 = gemm('N','T', (h_neg-abs2(h_neg)) .* (0.5-h_neg), (v_neg-abs2(v_neg)) .* (0.5-v_neg)) .* rbm.W2
         axpy!(-2.0*lr, buf3, dW)  
         #println("third order term  ",sum(buf3)/(size(dW,1)*size(dW,2)))
     end    
@@ -388,6 +395,12 @@ function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf; approx="CD")
     axpy!(rbm.momentum, rbm.dW_prev, dW)
     # rbm.W +=  dW
     axpy!(1.0, dW, rbm.W)
+    if contains(approx,"tap")
+        rbm.W2=rbm.W.*rbm.W
+    end
+    if approx == "tap3"
+        rbm.W3=rbm.W2.*rbm.W
+    end
     # save current dW
     copy!(rbm.dW_prev, dW)
 end
@@ -399,12 +412,12 @@ function update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, b
     gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
 
     if contains(approx,"tap") 
-        buf2 = gemm('N', 'T', h_neg-h_neg.^2, v_neg-v_neg.^2) .* rbm.W  
+        buf2 = gemm('N', 'T', h_neg-abs2(h_neg), v_neg-abs2(v_neg)) .* rbm.W  
         axpy!(-lr, buf2, dW)
         #println("second order term  ",sum(buf2)/(size(dW,1)*size(dW,2)))
     end
     if approx == "tap3"
-        buf3 = gemm('N','T', (h_neg-h_neg.^2) .* (0.5-h_neg), (v_neg-v_neg.^2) .* (0.5-v_neg)) .* rbm.W.^2
+        buf3 = gemm('N','T', (h_neg-abs2(h_neg)) .* (0.5-h_neg), (v_neg-abs2(v_neg)) .* (0.5-v_neg)) .* rbm.W2
         axpy!(-2.0*lr, buf3, dW)  
         #println("third order term  ",sum(buf3)/(size(dW,1)*size(dW,2)))
     end  
@@ -417,7 +430,12 @@ function update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, b
 
     # rbm.W += lr * dW
     axpy!(1.0, dW, rbm.W)
-    
+    if contains(approx,"tap")
+        rbm.W2=rbm.W.*rbm.W
+    end
+    if approx == "tap3"
+        rbm.W3=rbm.W2.*rbm.W
+    end
     # save current dW
     copy!(rbm.dW_prev, dW)
 end
@@ -429,12 +447,12 @@ function update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf,
     gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
 
     if contains(approx,"tap") 
-        buf2 = gemm('N', 'T', h_neg-h_neg.^2, v_neg-v_neg.^2) .* rbm.W  
+        buf2 = gemm('N', 'T', h_neg-abs2(h_neg), v_neg-abs2(v_neg)) .* rbm.W  
         axpy!(-lr, buf2, dW)
         #println("second order term  ",sum(buf2)/(size(dW,1)*size(dW,2)))
     end
     if approx == "tap3"
-        buf3 = gemm('N','T', (h_neg-h_neg.^2) .* (0.5-h_neg), (v_neg-v_neg.^2) .* (0.5-v_neg)) .* rbm.W.^2
+        buf3 = gemm('N','T', (h_neg-abs2(h_neg)) .* (0.5-h_neg), (v_neg-abs2(v_neg)) .* (0.5-v_neg)) .* rbm.W2
         axpy!(-2.0*lr, buf3, dW)  
         #println("third order term  ",sum(buf3)/(size(dW,1)*size(dW,2)))
     end  
@@ -448,7 +466,12 @@ function update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf,
 
     # rbm.W += lr * dW
     axpy!(1.0, dW, rbm.W)
-    
+    if contains(approx,"tap")
+        rbm.W2=rbm.W.*rbm.W
+    end
+    if approx == "tap3"
+        rbm.W3=rbm.W2.*rbm.W
+    end
     # save current dW
     copy!(rbm.dW_prev, dW)
 end
@@ -475,7 +498,7 @@ function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; accelerat
 
     if approx == "CD"
         # take positive samples from real data
-        v_pos, h_pos, _, _ = gibbs(rbm, vis; accelerate=accelerate)
+        v_pos, h_pos, _, _ = gibbs(rbm, vis; n_times=1, accelerate=accelerate)
         # take negative samples from "fantasy particles"
         _, _, v_neg, h_neg = gibbs(rbm, rbm.persistent_chain_vis; n_times=n_gibbs,accelerate=accelerate)
         rbm.persistent_chain_vis = v_neg
@@ -513,65 +536,6 @@ function fit_batch!(rbm::RBM, vis::Mat{Float64};
 
     return rbm
 end
-
-# function fit_batch_tap2!(rbm::RBM, vis::Mat{Float64};
-#                     persistent=true, buf=None, lr=0.1, n_gibbs=1,accelerate=false,
-#                     weight_decay="none",decay_mag=0.01, approx="CD")
-#     buf = buf == None ? zeros(size(rbm.W)) : buf
-
-#     if size(rbm.persistent_chain_vis) != size(vis)
-#         # persistent_chain not initialized or batch size changed, re-initialize
-#         rbm.persistent_chain_vis = vis
-#         rbm.persistent_chain_hid = hid_means(rbm,vis)
-#     end
-
-#     v_pos = vis
-#     h_pos = hid_means(rbm, v_pos)
-
-#     v_neg = rbm.persistent_chain_vis
-#     h_neg = rbm.persistent_chain_hid
-
-#     for i=1:n_gibbs
-#        v_neg = 0.5 * mag_vis_tap2(rbm, v_neg, h_neg) + 0.5 * v_neg
-#        h_neg = 0.5 * mag_hid_tap2(rbm, v_neg, h_neg) + 0.5 * h_neg
-#     end
-
-#     rbm.persistent_chain_vis=v_neg
-#     rbm.persistent_chain_hid=h_neg
-
-
-#     # dW = (h_pos * v_pos') - (h_neg * v_neg')
-#     dW = zeros(size(rbm.W))
-#     # dW = (h_pos * v_pos') - (h_neg * v_neg')
-#     gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
-#     gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
-
-
-#     buf2 = gemm('N', 'T', h_neg-h_neg.^2, v_neg-v_neg.^2) .* rbm.W  
-#     axpy!(-lr, buf2, dW)
-#         #println("second order term  ",sum(buf2)/(size(dW,1)*size(dW,2)))
-
- 
-#     # rbm.W += rbm.momentum * rbm.dW_prev
-#     axpy!(rbm.momentum, rbm.dW_prev, dW)
-
-#     # Apply Weight-Decay Penalty
-#     # rbm.W += -lr * L2-Penalty-Gradient
-#     axpy!(lr*decay_mag,-rbm.W,dW)
-
-#     # rbm.W += lr * dW
-#     axpy!(1.0, dW, rbm.W)
-    
-#     # save current dW
-#     copy!(rbm.dW_prev, dW)
-
-#     # save current dW
-#     #copy!(rbm.dW_prev, dW)
-
-#     rbm.hbias += vec(lr * (sum(h_pos, 2) - sum(h_neg, 2)))
-#     rbm.vbias += vec(lr * (sum(v_pos, 2) - sum(v_neg, 2)))
-#     return rbm
-# end
 
 function transform(rbm::RBM, X::Mat{Float64})
     return hid_means(rbm, X)
@@ -650,61 +614,3 @@ the user options.
     end
     return rbm, pseudo_likelihood, tap_likelihood
 end
-
-# function fit_tap2(rbm::RBM, X::Mat{Float64};
-#              persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1,accelerate=false,
-#              weight_decay="none",decay_magnitude=0.01, approx="CD")
-
-# The core RBM training function. Learns the weights and biasings using 
-# either standard Contrastive Divergence (CD) or Persistent CD, depending on
-# the user options. 
-
-# ### Required Inputs
-# - *rbm:* RBM object, initialized by `RBM()`/`GRBM()`
-# - *X:* Set of training vectors
-
-# ### Optional Inputs
-#  - *persistent:* Whether or not to use persistent-CD [default=true]
-#  - *n_iter:* Number of training epochs [default=10]
-#  - *batch_size:* Minibatch size [default=100]
-#  - *n_gibbs:* Number of Gibbs sampling steps on the Markov Chain [default=1]
-#  - *accelerate:* Flag controlling whether or not to use Apple's Accelerate framework
-#                  to speed up some computations. Unused on non-OSX systems. [default=true]
-#  - *weight_decay:* A string value representing the regularization to add to apply to the 
-#                    weight magnitude during training {"none","l1","l2"}/ [default="none"]
-#  - *decay_magnitude:* Relative importance assigned to the weight regularization. Smaller
-#                       values represent less regularization. Should be in range (0,1). 
-#                       [default=0.01]
-
-#     @assert minimum(X) >= 0 && maximum(X) <= 1
-
-#     # Check OS and deny AppleAccelerate to non-OSX systems
-#     accelerate = @osx? accelerate : false
-
-#     n_samples = size(X, 2)
-#     n_batches = @compat Int(ceil(n_samples / batch_size))
-#     w_buf = zeros(size(rbm.W))
-
-#     lr=lr/batch_size
-
-#     pseudo_likelihood = zeros(n_iter,1)
-#     tap_likelihood = zeros(n_iter,1)
-#     for itr=1:n_iter
-#         # tic()
-#         for i=1:n_batches
-#             batch = X[:, ((i-1)*batch_size + 1):min(i*batch_size, end)]
-#             batch = full(batch)
-#             fit_batch_tap2!(rbm, batch, persistent=persistent,
-#                        buf=w_buf, n_gibbs=n_gibbs, accelerate=accelerate;
-#                        weight_decay=weight_decay, decay_mag=decay_magnitude, approx=approx, lr=lr)
-#         end
-#         # toc()
-#         pseudo = mean(score_samples(rbm, X))/(size(rbm.W)[1]+size(rbm.W)[2])
-#         tap = mean(score_samples_TAP(rbm, X))/(size(rbm.W)[1]+size(rbm.W)[2])
-#         println("Iteration #$itr, pseudo-likelihood = $pseudo, tap-likelihood = $tap")
-#         pseudo_likelihood[itr] = pseudo
-#         tap_likelihood[itr] = tap
-
-#     end
-#     return rbm, pseudo_likelihood, tap_likelihood
-# end
