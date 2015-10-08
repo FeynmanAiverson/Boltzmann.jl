@@ -94,9 +94,7 @@ function plot_chain(rbm::RBM)
 end
 
 function plot_vbias(rbm::RBM)
-    if minimum(rbm.VisShape)==1
-        vectorMode = true
-    end
+    vectorMode = minimum(rbm.VisShape)==1 ? true : false
 
     if vectorMode
         plt.plot(rbm.vbias)
