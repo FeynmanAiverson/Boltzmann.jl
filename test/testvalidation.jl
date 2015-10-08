@@ -13,8 +13,8 @@ function run_mnist()
     Epochs = 10;
     LearningRate = 0.1;
 
-    m_valid = BernoulliRBM(28*28, HiddenUnits; momentum=0.5, dataset=TrainSet)
-    m = BernoulliRBM(28*28, HiddenUnits; momentum=0.5, dataset=TrainSet)
+    m_valid = BernoulliRBM(28*28, HiddenUnits, (28,28); momentum=0.5, dataset=TrainSet)
+    m = BernoulliRBM(28*28, HiddenUnits, (28,28); momentum=0.5, dataset=TrainSet)
     
     # Fit using Validation Set
     fit(m_valid, TrainSet;n_iter=Epochs,lr=LearningRate,validation=ValidSet)

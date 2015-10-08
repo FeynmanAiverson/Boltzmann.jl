@@ -3,6 +3,9 @@ using Distributions
 using Base.LinAlg.BLAS
 using Compat
 using Devectorize
+using PyCall
+@pyimport matplotlib.pyplot as plt
+
 
 import Base.getindex
 import StatsBase.fit
@@ -13,6 +16,7 @@ typealias Vec{T} AbstractArray{T, 1}
 typealias Gaussian Normal
 
 abstract AbstractRBM
+abstract AbstractMonitor
 
 @runonce type RBM{V,H} <: AbstractRBM
     W::Matrix{Float64}
@@ -22,10 +26,92 @@ abstract AbstractRBM
     dW_prev::Matrix{Float64}
     persistent_chain::Matrix{Float64}
     momentum::Float64
+    VisShape::Tuple{Int,Int}
+end
+
+@runonce type Monitor <: AbstractMonitor
+    LastIndex::Int
+    UseValidation::Bool
+    MonitorEvery::Int
+    MonitorVisual::Bool
+    MonitorText::Bool
+    Epochs::Vector{Float64}
+    LearnRate::Vector{Float64}
+    Momentum::Vector{Float64}
+    PseudoLikelihood::Vector{Float64}
+    ValidationPseudoLikelihood::Vector{Float64}
+    ReconError::Vector{Float64}
+    ValidationReconError::Vector{Float64}
+    BatchTime_µs::Vector{Float64}
+    FigureHandle
+end
+
+function Monitor(n_iter,monitor_every;monitor_vis=false,monitor_txt=true,validation=false)
+    len = convert(Int,floor(n_iter/monitor_every))
+    blank_vector1 = vec(fill!(Array(Float64,len,1),convert(Float64,NaN)))
+    blank_vector2 = copy(blank_vector1)
+    blank_vector3 = copy(blank_vector1)
+    blank_vector4 = copy(blank_vector1)
+    blank_vector5 = copy(blank_vector1)
+    blank_vector6 = copy(blank_vector1)
+    blank_vector7 = copy(blank_vector1)
+    blank_vector8 = copy(blank_vector1)
+
+    if monitor_vis
+        fh = plt.figure(1;figsize=(11,15))
+    else
+        fh = NaN
+    end
+
+    Monitor(0,                   # Last Index
+            validation,          # Flag for validation set
+            monitor_every,       # When to display
+            monitor_vis,         # Monitor visal display flag
+            monitor_txt,         # Monitor text display flag
+            blank_vector1,       # Epochs (for x-axes)
+            blank_vector2,       # Learn Rate
+            blank_vector3,       # Momentum
+            blank_vector4,       # Pseudo-Likelihood
+            blank_vector5,       # Validation Pseudo-Likelihood
+            blank_vector6,       # ReconError
+            blank_vector7,       # ValidationReconError
+            blank_vector8,       # BatchTime_µs
+            fh)                  # Monitor Figure Handle
+end
+
+function UpdateMonitor!(rbm::RBM,mon::Monitor,dataset::Mat{Float64},itr::Int;validation=[],bt=NaN,lr=NaN,mo=NaN)
+    nh = size(rbm.W,1)
+    nv = size(rbm.W,2)
+    N = nh + nv
+
+    if itr%mon.MonitorEvery==0
+        if mon.UseValidation 
+            vpl = mean(score_samples(rbm, validation))/N
+            vre = recon_error(rbm,validation)/N
+        else
+            vpl = NaN
+            vre = NaN
+        end
+        pl = mean(score_samples(rbm, dataset))/N      
+        re = recon_error(rbm,dataset)/N
+
+        mon.LastIndex+=1
+        li = mon.LastIndex
+
+        mon.PseudoLikelihood[li] = pl
+        mon.ReconError[li] = re
+        mon.ValidationPseudoLikelihood[li] = vpl
+        mon.ValidationReconError[li] = vre
+        mon.Epochs[li] = itr
+        mon.Momentum[li] = mo
+        mon.LearnRate[li] = lr
+        mon.BatchTime_µs[li] = bt
+    end 
 end
 
 function RBM(V::Type, H::Type,
-             n_vis::Int, n_hid::Int; sigma=0.01, momentum=0.0, dataset=[])
+             n_vis::Int, n_hid::Int,
+             visshape::Tuple{Int,Int}; sigma=0.01, momentum=0.0, dataset=[])
 
     if isempty(dataset)
         RBM{V,H}(rand(Normal(0, sigma), (n_hid, n_vis)),        # W
@@ -34,7 +120,8 @@ function RBM(V::Type, H::Type,
                  zeros(n_hid, n_vis),                           # dW
                  zeros(n_hid, n_vis),                           # dW_prev
                  Array(Float64, 0, 0),                          # persistent_chain
-                 momentum)                                      # momentum
+                 momentum,                                      # momentum
+                 visshape)                                      # Shape of the visible units (for display)
     else
         ProbVis = mean(dataset,2)   # Mean across samples
         ProbVis = max(ProbVis,1e-8)
@@ -47,7 +134,8 @@ function RBM(V::Type, H::Type,
              zeros(n_hid, n_vis),                               # dW                 
              zeros(n_hid, n_vis),                               # dW_prev                 
              Array(Float64, 0, 0),                              # persistent_chain                 
-             momentum)                                          # momentum     
+             momentum,                                          # momentum     
+             visshape)                                      # Shape of the visible units (for display)
     end
 end
 
@@ -60,11 +148,11 @@ end
 
 
 typealias BernoulliRBM RBM{Bernoulli, Bernoulli}
-BernoulliRBM(n_vis::Int, n_hid::Int; sigma=0.01, momentum=0.0, dataset=[]) =
-    RBM(Bernoulli, Bernoulli, n_vis, n_hid; sigma=sigma, momentum=momentum, dataset=dataset)
+BernoulliRBM(n_vis::Int, n_hid::Int, visshape::Tuple{Int,Int}; sigma=0.01, momentum=0.0, dataset=[]) =
+    RBM(Bernoulli, Bernoulli, n_vis, n_hid, visshape; sigma=sigma, momentum=momentum, dataset=dataset)
 typealias GRBM RBM{Gaussian, Bernoulli}
-GRBM(n_vis::Int, n_hid::Int; sigma=0.01, momentum=0.0, dataset=[]) =
-    RBM(Gaussian, Bernoulli, n_vis, n_hid; sigma=sigma, momentum=momentum, dataset=dataset)
+GRBM(n_vis::Int, n_hid::Int, visshape::Tuple{Int,Int}; sigma=0.01, momentum=0.0, dataset=[]) =
+    RBM(Gaussian, Bernoulli, n_vis, n_hid, visshape; sigma=sigma, momentum=momentum, dataset=dataset)
 
 
 ### Base Definitions
@@ -162,6 +250,16 @@ function score_samples(rbm::RBM, vis::Mat{Float64}; sample_size=10000)
     fe = free_energy(rbm, vis)
     fe_corrupted = free_energy(rbm, vis_corrupted)
     return n_feat * log(logistic(fe_corrupted - fe))
+end
+
+function recon_error(rbm::RBM, vis::Mat{Float64})
+    # Fully forward MF operation to get back to visible samples
+    vis_rec = vis_means(rbm,hid_means(rbm,vis))
+    # Get the total error over the whole tested visible set,
+    # here, as MSE
+    dif = vis_rec - vis
+    mse = mean(dif.*dif)
+    return mse
 end
 
 
@@ -285,7 +383,7 @@ features(rbm::RBM; transpose=true) = components(rbm, transpose)
 function fit(rbm::RBM, X::Mat{Float64};
              persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1,
              weight_decay="none",decay_magnitude=0.01,validation=[],
-             score_every=5)
+             monitor_every=5,monitor_vis=false)
 #=
 The core RBM training function. Learns the weights and biasings using 
 either standard Contrastive Divergence (CD) or Persistent CD, depending on
@@ -329,6 +427,9 @@ the user options.
         n_valid=size(validation,2)        
     end
 
+    # Create the historical monitor
+    ProgressMonitor = Monitor(n_iter,monitor_every;monitor_vis=monitor_vis,
+                                                   validation=flag_use_validation)
 
     # Print info to user
     m_ = rbm.momentum
@@ -371,16 +472,10 @@ the user options.
                                    decay_magnitude=decay_magnitude,
                                    lr=lr)
         end
-        walltime=toq()/n_batches/N
-        if mod(itr,score_every) == 0
-            pl = mean(score_samples(rbm, X))/N
-            if flag_use_validation
-                pl_valid = mean(score_samples(rbm, validation))/N
-                @printf("[Epoch %04d] Train(pl : %0.3f), Valid(pl : %0.3f)  [%0.3f µsec/batch/unit]\n",itr,pl,pl_valid,walltime*1e6)
-            else
-                @printf("[Epoch %04d] Train(pl : %0.3f)  [%0.3f µsec/batch]\n",itr,pl,walltime*1e6)
-            end
-        end
+        walltime_µs=(toq()/n_batches/N)*1e6
+
+        UpdateMonitor!(rbm,ProgressMonitor,X,itr;bt=walltime_µs,validation=validation)
+        ShowMonitor(rbm,ProgressMonitor,itr)
     end
-    return rbm
+    return rbm, ProgressMonitor
 end

@@ -4,7 +4,5 @@ Distributions 0.5
 HDF5 0.4
 Compat 0.4
 Devectorize 0.4.1
-Gadfly 0.3.14
-ImageView 0.1.16
-Colors 0.5.2
 Images 0.4.46
+PyCall 1.1.2
