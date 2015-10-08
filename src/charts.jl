@@ -80,6 +80,7 @@ function plot_evolution(mon::Monitor)
 end
 
 function plot_rf(rbm::RBM)
+    # TODO: Implement RF display in the case of 1D signals
     rf = chart_weights(rbm.W,rbm.VisShape; padding=0,noshow=true)    
     plt.imshow(rf;interpolation="Nearest")
     plt.title("Receptive Fields")
@@ -87,6 +88,7 @@ function plot_rf(rbm::RBM)
 end
 
 function plot_chain(rbm::RBM)
+    # TODO: Implement Chain display in the case of 1D signals
     pc = chart_weights(rbm.persistent_chain',rbm.VisShape; padding=0,noshow=true,ordering=false)    
     plt.imshow(pc;interpolation="Nearest")
     plt.title("Visible Chain")
