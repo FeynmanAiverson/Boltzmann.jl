@@ -7,22 +7,22 @@ X = rand(1000, 200)
 
 
 function brbm_smoke_test()
-    model = BernoulliRBM(1000, 500)
+    model = BernoulliRBM(1000, 500, (1000,1))
     fit(model, X)
 end
 
 function grbm_smoke_test()
-    model = GRBM(1000, 500)
+    model = GRBM(1000, 500, (1000,1))
     fit(model, X)
 end
 
 function conf_smoke_test()
-    model = RBM(Normal, Normal, 1000, 500)
+    model = RBM(Normal, Normal, 1000, 500,(1000,1))
     fit(model, X)
 end
 
 function init_smoke_test()
-    model = RBM(Normal, Normal, 1000, 500;dataset=X)
+    model = RBM(Normal, Normal, 1000, 500, (1000,1);dataset=X)
     fit(model, X)
 end
 

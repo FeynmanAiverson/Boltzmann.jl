@@ -2,8 +2,10 @@
 using Distributions
 using Base.LinAlg.BLAS
 using Compat
-using AppleAccelerate
 using Devectorize
+using PyCall
+@pyimport matplotlib.pyplot as plt
+
 
 import Base.getindex
 import StatsBase.fit
@@ -14,6 +16,7 @@ typealias Vec{T} AbstractArray{T, 1}
 typealias Gaussian Normal
 
 abstract AbstractRBM
+abstract AbstractMonitor
 
 @runonce type RBM{V,H} <: AbstractRBM
     W::Matrix{Float64}
@@ -21,40 +24,127 @@ abstract AbstractRBM
     W3::Matrix{Float64}
     vbias::Vector{Float64}
     hbias::Vector{Float64}
+    dW::Matrix{Float64}
     dW_prev::Matrix{Float64}
     persistent_chain_vis::Matrix{Float64}
     persistent_chain_hid::Matrix{Float64}
     momentum::Float64
+    VisShape::Tuple{Int,Int}
+end
+
+@runonce type Monitor <: AbstractMonitor
+    LastIndex::Int
+    UseValidation::Bool
+    MonitorEvery::Int
+    MonitorVisual::Bool
+    MonitorText::Bool
+    Epochs::Vector{Float64}
+    LearnRate::Vector{Float64}
+    Momentum::Vector{Float64}
+    PseudoLikelihood::Vector{Float64}
+    ValidationPseudoLikelihood::Vector{Float64}
+    ReconError::Vector{Float64}
+    ValidationReconError::Vector{Float64}
+    BatchTime_µs::Vector{Float64}
+    FigureHandle
+end
+
+function Monitor(n_iter,monitor_every;monitor_vis=false,monitor_txt=true,validation=false)
+    len = convert(Int,floor(n_iter/monitor_every))
+    blank_vector1 = vec(fill!(Array(Float64,len,1),convert(Float64,NaN)))
+    blank_vector2 = copy(blank_vector1)
+    blank_vector3 = copy(blank_vector1)
+    blank_vector4 = copy(blank_vector1)
+    blank_vector5 = copy(blank_vector1)
+    blank_vector6 = copy(blank_vector1)
+    blank_vector7 = copy(blank_vector1)
+    blank_vector8 = copy(blank_vector1)
+
+    if monitor_vis
+        fh = plt.figure(1;figsize=(11,15))
+    else
+        fh = NaN
+    end
+
+    Monitor(0,                   # Last Index
+            validation,          # Flag for validation set
+            monitor_every,       # When to display
+            monitor_vis,         # Monitor visal display flag
+            monitor_txt,         # Monitor text display flag
+            blank_vector1,       # Epochs (for x-axes)
+            blank_vector2,       # Learn Rate
+            blank_vector3,       # Momentum
+            blank_vector4,       # Pseudo-Likelihood
+            blank_vector5,       # Validation Pseudo-Likelihood
+            blank_vector6,       # ReconError
+            blank_vector7,       # ValidationReconError
+            blank_vector8,       # BatchTime_µs
+            fh)                  # Monitor Figure Handle
+end
+
+function UpdateMonitor!(rbm::RBM,mon::Monitor,dataset::Mat{Float64},itr::Int;validation=[],bt=NaN,lr=NaN,mo=NaN)
+    nh = size(rbm.W,1)
+    nv = size(rbm.W,2)
+    N = nh + nv
+
+    if itr%mon.MonitorEvery==0
+        if mon.UseValidation 
+            vpl = mean(score_samples(rbm, validation))/N
+            vre = recon_error(rbm,validation)/N
+        else
+            vpl = NaN
+            vre = NaN
+        end
+        pl = mean(score_samples(rbm, dataset))/N      
+        re = recon_error(rbm,dataset)/N
+
+        mon.LastIndex+=1
+        li = mon.LastIndex
+
+        mon.PseudoLikelihood[li] = pl
+        mon.ReconError[li] = re
+        mon.ValidationPseudoLikelihood[li] = vpl
+        mon.ValidationReconError[li] = vre
+        mon.Epochs[li] = itr
+        mon.Momentum[li] = mo
+        mon.LearnRate[li] = lr
+        mon.BatchTime_µs[li] = bt
+    end 
 end
 
 function RBM(V::Type, H::Type,
-             n_vis::Int, n_hid::Int; sigma=0.1, momentum=0.5, dataset=[])
+             n_vis::Int, n_hid::Int,
+             visshape::Tuple{Int,Int}; sigma=0.1, momentum=0.0, dataset=[])
 
     if isempty(dataset)
-        RBM{V,H}(rand(Normal(0, sigma), (n_hid, n_vis)),
-                 zeros(n_hid,n_vis),
-                 zeros(n_hid,n_vis),
-                 zeros(n_vis), 
-                 zeros(n_hid),
-                 zeros(n_hid, n_vis),
-                 Array(Float64, 0, 0),
-                 Array(Float64, 0, 0),
-                 momentum)
+        RBM{V,H}(rand(Normal(0, sigma), (n_hid, n_vis)),        # W
+				 zeros(n_hid,n_vis),							# W2
+				 zeros(n_hid,n_vis),							# W3
+                 zeros(n_vis),                                  # vbias
+                 zeros(n_hid),                                  # hbias
+                 zeros(n_hid, n_vis),                           # dW
+                 zeros(n_hid, n_vis),                           # dW_prev
+                 Array(Float64, 0, 0),                          # persistent_chain_vis
+                 Array(Float64, 0, 0),                          # persistent_chain_hid
+                 momentum,                                      # momentum
+                 visshape)                                      # Shape of the visible units (for display)
     else
         ProbVis = mean(dataset,2)   # Mean across samples
-        ProbVis = max(ProbVis,1e-20)
-        ProbVis = min(ProbVis,1 - 1e-20)
+        ProbVis = max(ProbVis,1e-8)
+        ProbVis = min(ProbVis,1 - 1e-8)
         @devec InitVis = log(ProbVis ./ (1-ProbVis))
 
-        RBM{V,H}(rand(Normal(0, sigma), (n_hid, n_vis)),
-             zeros(n_hid,n_vis),
-             zeros(n_hid,n_vis),
-             vec(InitVis), 
-             zeros(n_hid),
-             zeros(n_hid, n_vis),
-             Array(Float64, 0, 0),
-             Array(Float64, 0, 0),
-             momentum)
+     	RBM{V,H}(rand(Normal(0, sigma), (n_hid, n_vis)),   		# W
+				 zeros(n_hid,n_vis),							# W2
+				 zeros(n_hid,n_vis),							# W3
+                 vec(InitVis),                                  # vbias
+                 zeros(n_hid),                                  # hbias
+                 zeros(n_hid, n_vis),                           # dW
+                 zeros(n_hid, n_vis),                           # dW_prev
+                 Array(Float64, 0, 0),                          # persistent_chain_vis
+                 Array(Float64, 0, 0),                          # persistent_chain_hid
+                 momentum,                                      # momentum
+                 visshape)                                      # Shape of the visible units (for display)
     end
 end
 
@@ -67,11 +157,11 @@ end
 
 
 typealias BernoulliRBM RBM{Bernoulli, Bernoulli}
-BernoulliRBM(n_vis::Int, n_hid::Int; sigma=0.1, momentum=0.9, dataset=[]) =
-    RBM(Bernoulli, Bernoulli, n_vis, n_hid; sigma=sigma, momentum=momentum, dataset=dataset)
+BernoulliRBM(n_vis::Int, n_hid::Int, visshape::Tuple{Int,Int}; sigma=0.1, momentum=0.0, dataset=[]) =
+    RBM(Bernoulli, Bernoulli, n_vis, n_hid, visshape; sigma=sigma, momentum=momentum, dataset=dataset)
 typealias GRBM RBM{Gaussian, Bernoulli}
-GRBM(n_vis::Int, n_hid::Int; sigma=0.1, momentum=0.9, dataset=[]) =
-    RBM(Gaussian, Bernoulli, n_vis, n_hid; sigma=sigma, momentum=momentum, dataset=dataset)
+GRBM(n_vis::Int, n_hid::Int, visshape::Tuple{Int,Int}; sigma=0.1, momentum=0.0, dataset=[]) =
+    RBM(Gaussian, Bernoulli, n_vis, n_hid, visshape; sigma=sigma, momentum=momentum, dataset=dataset)
 
 
 ### Base Definitions
@@ -118,13 +208,38 @@ end
     
 function sample_hiddens{V,H}(rbm::RBM{V,H}, vis::Mat{Float64})
     means = hid_means(rbm, vis)
-    return sample(H, means)
+    return sample(H, means), means
 end
 
 function sample_visibles{V,H}(rbm::RBM{V,H}, hid::Mat{Float64})
     means = vis_means(rbm, hid)
     return sample(V, means)
 end
+
+
+function gibbs(rbm::RBM, vis::Mat{Float64}; n_times=1)
+    #print("gibbs")
+    v_pos = vis
+    h_samp, h_pos = sample_hiddens(rbm, v_pos)
+    h_neg = Array(Float64,0,0)::Mat{Float64}
+    v_neg = Array(Float64,0,0)::Mat{Float64}
+    if n_times > 0
+    # Save computation by setting `n_times=0` in the case
+    # of persistent CD.
+        v_neg = sample_visibles(rbm, h_samp)
+        h_samp, h_neg = sample_hiddens(rbm, v_neg)
+        for i=1:n_times-1
+            v_neg = sample_visibles(rbm, h_samp)
+            h_neg = sample_hiddens(rbm, v_neg)
+        end
+    end
+
+    h_pos=hid_means(rbm,v_pos)
+    h_neg=hid_means(rbm,v_neg)
+    return v_pos, h_pos, v_neg, h_neg
+end
+
+
 
 ### Base MF definitions
 #### Naive mean field
@@ -198,82 +313,6 @@ function mag_hid_tap3(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64})
 end
 
 
-### Apple Accelerate Definitions
-function logisticAccel(x::Mat{Float64})
-    s = AppleAccelerate.rec(1+AppleAccelerate.exp(-x))
-    return s
-end
-
-function logisticAccel(x::Vec{Float64})
-    s = AppleAccelerate.rec(1+AppleAccelerate.exp(-x))
-    return s
-end
-
-function hid_meansAccel(rbm::RBM, vis::Mat{Float64})
-    p = rbm.W * vis .+ rbm.hbias
-    return logisticAccel(p)
-end
-
-function vis_meansAccel(rbm::RBM, hid::Mat{Float64})
-    p = rbm.W' * hid .+ rbm.vbias
-    return logisticAccel(p)
-end
-
-function sampleAccel(::Type{Bernoulli}, means::Mat{Float64})
-    s = zeros(means)
-    r = rand(size(means))
-    @simd for i=1:length(means)
-        @inbounds s[i] = r[i] < means[i] ? 1.0 : 0.0
-    end    
-    return s
-end
-
-function sampleAccel(::Type{Gaussian}, means::Mat{Float64})
-    sigma2 = 1                   # using fixed standard diviation
-    samples = zeros(size(means))
-    for j=1:size(means, 2), i=1:size(means, 1)
-        samples[i, j] = rand(Normal(means[i, j], sigma2))
-    end
-    return samples
-end
-    
-function sample_hiddensAccel{V,H}(rbm::RBM{V, H}, vis::Mat{Float64})
-    means = hid_meansAccel(rbm, vis)
-    return sampleAccel(H, means)
-end
-
-function sample_visiblesAccel{V,H}(rbm::RBM{V,H}, hid::Mat{Float64})
-    means = vis_meansAccel(rbm, hid)
-    return sampleAccel(V, means)
-end
-
-
-function gibbs(rbm::RBM, vis::Mat{Float64}; n_times=1, accelerate=false)
-    #print("gibbs")
-    v_pos = vis
-    if accelerate
-        # If the user has specified the use of the AppleAccelerate framework,
-        # call the optimized Accelerate versions of the sampler
-        h_pos = sample_hiddensAccel(rbm, v_pos)
-        v_neg = sample_visiblesAccel(rbm, h_pos)
-        h_neg = sample_hiddensAccel(rbm, v_neg)
-        for i=1:n_times-1
-            v_neg = sample_visiblesAccel(rbm, h_neg)
-            h_neg = sample_hiddensAccel(rbm, v_neg)
-        end
-    else        
-        h_pos = sample_hiddens(rbm, v_pos)
-        v_neg = sample_visibles(rbm, h_pos)
-        h_neg = sample_hiddens(rbm, v_neg)
-        for i=1:n_times-1
-            v_neg = sample_visibles(rbm, h_neg)
-            h_neg = sample_hiddens(rbm, v_neg)
-        end
-    end
-    h_pos=hid_means(rbm,v_pos)
-    h_neg=hid_means(rbm,v_neg)
-    return v_pos, h_pos, v_neg, h_neg
-end
 
 function iter_mag(rbm::RBM, vis::Mat{Float64}; n_times=3, approx="tap2")
     v_pos = vis
@@ -355,10 +394,19 @@ function score_samples(rbm::RBM, vis::Mat{Float64}; sample_size=10000)
     return n_feat * log(logistic(fe_corrupted - fe))
 end
 
+function recon_error(rbm::RBM, vis::Mat{Float64})
+    # Fully forward MF operation to get back to visible samples
+    vis_rec = vis_means(rbm,hid_means(rbm,vis))
+    # Get the total error over the whole tested visible set,
+    # here, as MSE
+    dif = vis_rec - vis
+    mse = mean(dif.*dif)
+    return mse
+end
+
 function score_samples_TAP(rbm::RBM, vis::Mat{Float64}; n_iter=5)
     _, _, m_vis, m_hid = iter_mag(rbm, vis; n_times=n_iter, approx="tap2")
     eps=1e-6
-
     m_vis = max(m_vis, eps)
     m_vis = min(m_vis, 1.0-eps)
     m_hid = max(m_hid, eps)
@@ -370,10 +418,9 @@ function score_samples_TAP(rbm::RBM, vis::Mat{Float64}; n_iter=5)
     fe_tap = U_naive + Onsager - S
     fe = free_energy(rbm, vis)
     return fe_tap - fe
-end    
+end 
 
-# for 
-function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf; approx="CD")
+function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr; approx="CD")
     # print("no weight decay")
     dW = zeros(size(rbm.W))
     # dW = pos - neg
@@ -405,7 +452,7 @@ function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf; approx="CD")
     copy!(rbm.dW_prev, dW)
 end
 
-function update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_mag; approx="CD")
+function update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, decay_mag; approx="CD")
     dW = zeros(size(rbm.W))
     # dW = (h_pos * v_pos') - (h_neg * v_neg')
     gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
@@ -426,9 +473,9 @@ function update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, b
 
     # Apply Weight-Decay Penalty
     # rbm.W += -lr * L2-Penalty-Gradient
-    axpy!(lr*decay_mag,-rbm.W,dW)
+    axpy!(-lr*decay_mag,rbm.W,dW)
 
-    # rbm.W += lr * dW
+    # rbm.W +=  dW
     axpy!(1.0, dW, rbm.W)
     if contains(approx,"tap")
         rbm.W2=rbm.W.*rbm.W
@@ -440,11 +487,11 @@ function update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, b
     copy!(rbm.dW_prev, dW)
 end
 
-function update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_mag ; approx="CD")
+function update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, decay_mag ; approx="CD")
     dW = zeros(size(rbm.W))
     # dW = (h_pos * v_pos') - (h_neg * v_neg')
-    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
-    gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
+    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)          # Not flushing rbm.dW since we multiply w/ 0.0
+    gemm!('N', 'T', lr, h_pos, v_pos, -1.0,dW)
 
     if contains(approx,"tap") 
         buf2 = gemm('N', 'T', h_neg-abs2(h_neg), v_neg-abs2(v_neg)) .* rbm.W  
@@ -462,7 +509,7 @@ function update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf,
 
     # Apply Weight-Decay Penalty
     # rbm.W += -lr * L1-Penalty-Gradient
-    axpy!(lr*decay_mag,-sign(rbm.W),dW)
+    axpy!(-lr*decay_mag,sign(rbm.W),dW)
 
     # rbm.W += lr * dW
     axpy!(1.0, dW, rbm.W)
@@ -477,10 +524,10 @@ function update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf,
 end
 
 
-function contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; accelerate=false, approx="CD")
+function contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; approx="CD")
     # print("non_persistent")
     if approx == "CD"     
-        v_pos, h_pos, v_neg, h_neg = gibbs(rbm, vis; n_times=n_gibbs, accelerate=accelerate)
+        v_pos, h_pos, v_neg, h_neg = gibbs(rbm, vis; n_times=n_gibbs)
     else
         v_pos, h_pos, v_neg, h_neg = iter_mag(rbm, vis; n_times=n_gibbs, approx=approx)
     end    
@@ -488,7 +535,7 @@ function contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; accelerate=false, ap
 end
 
 
-function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; accelerate=false, approx="CD")
+function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; approx="CD")
     # print("persistent")
     if size(rbm.persistent_chain_vis) != size(vis)
         # persistent_chain not initialized or batch size changed, re-initialize
@@ -498,9 +545,9 @@ function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; accelerat
 
     if approx == "CD"
         # take positive samples from real data
-        v_pos, h_pos, _, _ = gibbs(rbm, vis; n_times=1, accelerate=accelerate)
+        v_pos, h_pos, _, _ = gibbs(rbm, vis; n_times=1)
         # take negative samples from "fantasy particles"
-        _, _, v_neg, h_neg = gibbs(rbm, rbm.persistent_chain_vis; n_times=n_gibbs,accelerate=accelerate)
+        _, _, v_neg, h_neg = gibbs(rbm, rbm.persistent_chain_vis; n_times=n_gibbs)
         rbm.persistent_chain_vis = v_neg
     else
         v_pos, h_pos, v_neg, h_neg = iter_mag_persist!(rbm, vis; n_times=n_gibbs, approx=approx)
@@ -513,22 +560,19 @@ end
 
 
 function fit_batch!(rbm::RBM, vis::Mat{Float64};
-                    persistent=true, buf=None, lr=0.1, n_gibbs=1,accelerate=false,
+                    persistent=true, lr=0.1, n_gibbs=1,
                     weight_decay="none",decay_magnitude=0.01, approx="CD")
-    buf = buf == None ? zeros(size(rbm.W)) : buf
-
+    
     sampler = persistent ? persistent_contdiv : contdiv
-    v_pos, h_pos, v_neg, h_neg = sampler(rbm, vis, n_gibbs; accelerate=accelerate, approx=approx)
-
-    # lr=lr/size(v_pos,2)
+    v_pos, h_pos, v_neg, h_neg = sampler(rbm, vis, n_gibbs; approx=approx)
 
     # Gradient Update on Weights
     if weight_decay=="l2"
-        update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_magnitude, approx=approx)
+        update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, decay_magnitude, approx=approx)
     elseif weight_decay=="l1"
-        update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, decay_magnitude, approx=approx)
+        update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, decay_magnitude, approx=approx)
     else
-        update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, buf, approx=approx)
+        update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, approx=approx)
     end
 
     rbm.hbias += vec(lr * (sum(h_pos, 2) - sum(h_neg, 2)))
@@ -558,8 +602,9 @@ end
 features(rbm::RBM; transpose=true) = components(rbm, transpose)
 
 function fit(rbm::RBM, X::Mat{Float64};
-             persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1,accelerate=false,
-             weight_decay="none",decay_magnitude=0.01, approx="CD")
+             persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1,
+             weight_decay="none",decay_magnitude=0.01,validation=[],
+             monitor_every=5,monitor_vis=false, approx="CD")
 #=
 The core RBM training function. Learns the weights and biasings using 
 either standard Contrastive Divergence (CD) or Persistent CD, depending on
@@ -571,46 +616,98 @@ the user options.
 
 ### Optional Inputs
  - *persistent:* Whether or not to use persistent-CD [default=true]
+ - *lr:* Learning rate [default=0.1]
  - *n_iter:* Number of training epochs [default=10]
  - *batch_size:* Minibatch size [default=100]
  - *n_gibbs:* Number of Gibbs sampling steps on the Markov Chain [default=1]
- - *accelerate:* Flag controlling whether or not to use Apple's Accelerate framework
-                 to speed up some computations. Unused on non-OSX systems. [default=true]
  - *weight_decay:* A string value representing the regularization to add to apply to the 
-                   weight magnitude during training {"none","l1","l2"}/ [default="none"]
+                   weight magnitude during training {"none","l1","l2"}. [default="none"]
  - *decay_magnitude:* Relative importance assigned to the weight regularization. Smaller
                       values represent less regularization. Should be in range (0,1). 
                       [default=0.01]
+ - *validation:* An array of validation samples, e.g. a held out set of training data.
+                 If passed, `fit` will also track generalization progress during training.
+                 [default=empty-set]
+ - *score_every:* Controls at which epoch the progress of the fit is monitored. Useful to 
+                  speed up the fit procedure if detailed progress monitoring is not required.
+                  [default=5]
 =#
     @assert minimum(X) >= 0 && maximum(X) <= 1
 
-    # Check OS and deny AppleAccelerate to non-OSX systems
-    accelerate = @osx? accelerate : false
-
+    n_valid=0
+    n_features = size(X, 1)
     n_samples = size(X, 2)
+    n_hidden = size(rbm.W,1)
     n_batches = @compat Int(ceil(n_samples / batch_size))
-    w_buf = zeros(size(rbm.W))
+    N = n_hidden+n_features
 
+    # Check for the existence of a validation set
+    flag_use_validation=false
+    if length(validation)!=0
+        flag_use_validation=true
+        n_valid=size(validation,2)        
+    end
+
+    # Create the historical monitor
+    ProgressMonitor = Monitor(n_iter,monitor_every;monitor_vis=monitor_vis,
+                                                   validation=flag_use_validation)
+
+    # Print info to user
+    m_ = rbm.momentum
+    info("=====================================")
+    info("RBM Training")
+    info("=====================================")
+    info("  + Training Samples:   $n_samples")
+    info("  + Features:           $n_features")
+    info("  + Hidden Units:       $n_hidden")
+    info("  + Epochs to run:      $n_iter")
+    info("  + Persistent CD?:     $persistent")
+    info("  + Momentum:           $m_")
+    info("  + Learning rate:      $lr")
+    info("  + Gibbs Steps:        $n_gibbs")   
+    info("  + Weight Decay?:      $weight_decay") 
+    info("  + Weight Decay Mag.:  $decay_magnitude")
+    info("  + Validation Set?:    $flag_use_validation")    
+    info("  + Validation Samples: $n_valid")   
+    info("=====================================")
+
+    # Scale the learning rate by the batch size
     lr=lr/batch_size
+
+    # Random initialization of the persistent chain
+    # It is okay if it isn't used in the actual training procedure.
+    p = shuffle!(collect(1:n_samples))[1:batch_size]
+    rbm.persistent_chain_vis = Array(Float64,n_features,batch_size)
+    for i=1:batch_size
+        rbm.persistent_chain_vis[:,i] = X[:,p[i]]
+    end
+    rbm.persistent_chain_hid = hid_means(rbm, rbm.persistent_chain_vis)
 
     pseudo_likelihood = zeros(n_iter,1)
     tap_likelihood = zeros(n_iter,1)
     for itr=1:n_iter
-        # tic()
+        tic()
         for i=1:n_batches
             batch = X[:, ((i-1)*batch_size + 1):min(i*batch_size, end)]
             batch = full(batch)
-            fit_batch!(rbm, batch, persistent=persistent,
-                       buf=w_buf, n_gibbs=n_gibbs, accelerate=accelerate;
-                       weight_decay=weight_decay, decay_magnitude=decay_magnitude, approx=approx, lr=lr)
+          
+            fit_batch!(rbm, batch; persistent=persistent, 
+                                   n_gibbs=n_gibbs,
+                                   weight_decay=weight_decay,
+                                   decay_magnitude=decay_magnitude,
+                                   lr=lr, approx=approx)
         end
-        # toc()
+        walltime_µs=(toq()/n_batches/N)*1e6
+        
         pseudo = mean(score_samples(rbm, X))/(size(rbm.W)[1]+size(rbm.W)[2])
         tap = mean(score_samples_TAP(rbm, X))/(size(rbm.W)[1]+size(rbm.W)[2])
         println("Iteration #$itr, pseudo-likelihood = $pseudo, tap-likelihood = $tap")
         pseudo_likelihood[itr] = pseudo
         tap_likelihood[itr] = tap
 
+        UpdateMonitor!(rbm,ProgressMonitor,X,itr;bt=walltime_µs,validation=validation)
+        ShowMonitor(rbm,ProgressMonitor,itr)
     end
-    return rbm, pseudo_likelihood, tap_likelihood
+
+    return rbm, ProgressMonitor
 end
