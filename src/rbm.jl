@@ -1,5 +1,6 @@
 
 using Distributions
+using ProgressMeter
 using Base.LinAlg.BLAS
 using Compat
 using Devectorize
@@ -92,6 +93,8 @@ function UpdateMonitor!(rbm::RBM,mon::Monitor,dataset::Mat{Float64},itr::Int;val
     nh = size(rbm.W,1)
     nv = size(rbm.W,2)
     N = nh + nv
+    nsamps = min(size(dataset,2),5000)      # Set maximum number of samples to test as 5000
+
 
     if itr%mon.MonitorEvery==0
         if mon.UseValidation 
@@ -103,9 +106,9 @@ function UpdateMonitor!(rbm::RBM,mon::Monitor,dataset::Mat{Float64},itr::Int;val
             vtl = NaN
             vre = NaN
         end
-        pl = mean(score_samples(rbm, dataset))/N  
-        tl = mean(score_samples_TAP(rbm, dataset))/N    
-        re = recon_error(rbm,dataset)/N
+        pl = mean(score_samples(rbm, dataset[:,1:nsamps]))/N  
+        tl = mean(score_samples_TAP(rbm, dataset[:,1:nsamps]))/N    
+        re = recon_error(rbm,dataset[:,1:nsamps])/N
 
         mon.LastIndex+=1
         li = mon.LastIndex
@@ -127,10 +130,13 @@ function RBM(V::Type, H::Type,
              n_vis::Int, n_hid::Int,
              visshape::Tuple{Int,Int}; sigma=0.1, momentum=0.0, dataset=[])
 
+    W = rand(Normal(0, sigma), (n_hid, n_vis))
+
+
     if isempty(dataset)
-        RBM{V,H}(rand(Normal(0, sigma), (n_hid, n_vis)),        # W
-				 zeros(n_hid,n_vis),							# W2
-				 zeros(n_hid,n_vis),							# W3
+        RBM{V,H}(W,                                             # W
+				 W.*W,							                # W2
+				 W.*W.*W,							            # W3
                  zeros(n_vis),                                  # vbias
                  zeros(n_hid),                                  # hbias
                  zeros(n_hid, n_vis),                           # dW
@@ -145,9 +151,9 @@ function RBM(V::Type, H::Type,
         ProbVis = min(ProbVis,1 - 1e-8)
         @devec InitVis = log(ProbVis ./ (1-ProbVis))
 
-     	RBM{V,H}(rand(Normal(0, sigma), (n_hid, n_vis)),   		# W
-				 zeros(n_hid,n_vis),							# W2
-				 zeros(n_hid,n_vis),							# W3
+     	RBM{V,H}(W,   		                                    # W
+				 W.*W,							                # W2
+				 W.*W.*W,							            # W3
                  vec(InitVis),                                  # vbias
                  zeros(n_hid),                                  # hbias
                  zeros(n_hid, n_vis),                           # dW
@@ -244,9 +250,6 @@ function gibbs(rbm::RBM, vis::Mat{Float64}; n_times=1)
             h_neg = sample_hiddens(rbm, v_neg)
         end
     end
-
-    h_pos=hid_means(rbm,v_pos)
-    h_neg=hid_means(rbm,v_neg)
     return v_pos, h_pos, v_neg, h_neg
 end
 
@@ -412,25 +415,25 @@ function score_samples_TAP(rbm::RBM, vis::Mat{Float64}; n_iter=5)
 end 
 
 function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr; approx="CD")
-    dW = zeros(size(rbm.W))
+    # dW = zeros(size(rbm.W))
     # dW = lr * ( (h_pos * v_pos') - (h_neg * v_neg') )
-    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
-    gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
+    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, rbm.dW)
+    gemm!('N', 'T', lr, h_pos, v_pos, -1.0, rbm.dW)
 
     if contains(approx,"tap") 
         buf2 = gemm('N', 'T', h_neg-abs2(h_neg), v_neg-abs2(v_neg)) .* rbm.W  
-        axpy!(-lr, buf2, dW)
+        axpy!(-lr, buf2, rbm.dW)
     end
 
     if approx == "tap3"
         buf3 = gemm('N','T', (h_neg-abs2(h_neg)) .* (0.5-h_neg), (v_neg-abs2(v_neg)) .* (0.5-v_neg)) .* rbm.W2
-        axpy!(-2.0*lr, buf3, dW)  
+        axpy!(-2.0*lr, buf3, rbm.dW)  
     end    
 
     # rbm.dW += rbm.momentum * rbm.dW_prev
-    axpy!(rbm.momentum, rbm.dW_prev, dW)
+    axpy!(rbm.momentum, rbm.dW_prev, rbm.dW)
     # rbm.W +=  dW
-    axpy!(1.0, dW, rbm.W)
+    axpy!(1.0, rbm.dW, rbm.W)
     if contains(approx,"tap")
         rbm.W2=rbm.W.*rbm.W
     end
@@ -438,34 +441,34 @@ function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr; approx="CD")
         rbm.W3=rbm.W2.*rbm.W
     end
     # save current dW
-    copy!(rbm.dW_prev, dW)
+    copy!(rbm.dW_prev, rbm.dW)
 end
 
 function update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, decay_mag; approx="CD")
-    dW = zeros(size(rbm.W))
+    # dW = zeros(size(rbm.W))
     
-    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
-    gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
+    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, rbm.dW)
+    gemm!('N', 'T', lr, h_pos, v_pos, -1.0, rbm.dW)
 
     if contains(approx,"tap") 
         buf2 = gemm('N', 'T', h_neg-abs2(h_neg), v_neg-abs2(v_neg)) .* rbm.W  
-        axpy!(-lr, buf2, dW)
+        axpy!(-lr, buf2, rbm.dW)
     end
 
     if approx == "tap3"
         buf3 = gemm('N','T', (h_neg-abs2(h_neg)) .* (0.5-h_neg), (v_neg-abs2(v_neg)) .* (0.5-v_neg)) .* rbm.W2
-        axpy!(-2.0*lr, buf3, dW)  
+        axpy!(-2.0*lr, buf3, rbm.dW)  
     end  
 
     # rbm.W += rbm.momentum * rbm.dW_prev
-    axpy!(rbm.momentum, rbm.dW_prev, dW)
+    axpy!(rbm.momentum, rbm.dW_prev, rbm.dW)
 
     # Apply Weight-Decay Penalty
     # rbm.W += -lr * L2-Penalty-Gradient
-    axpy!(-lr*decay_mag,rbm.W,dW)
+    axpy!(-lr*decay_mag,rbm.W,rbm.dW)
 
     # rbm.W +=  dW
-    axpy!(1.0, dW, rbm.W)
+    axpy!(1.0, rbm.dW, rbm.W)
     if contains(approx,"tap")
         rbm.W2=rbm.W.*rbm.W
     end
@@ -473,34 +476,34 @@ function update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, d
         rbm.W3=rbm.W2.*rbm.W
     end
     # save current dW
-    copy!(rbm.dW_prev, dW)
+    copy!(rbm.dW_prev, rbm.dW)
 end
 
 function update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, decay_mag ; approx="CD")
-    dW = zeros(size(rbm.W))
+    # dW = zeros(size(rbm.W))
     # dW = (h_pos * v_pos') - (h_neg * v_neg')
-    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)          # Not flushing rbm.dW since we multiply w/ 0.0
-    gemm!('N', 'T', lr, h_pos, v_pos, -1.0,dW)
+    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, rbm.dW)          # Not flushing rbm.dW since we multiply w/ 0.0
+    gemm!('N', 'T', lr, h_pos, v_pos, -1.0,rbm.dW)
 
     if contains(approx,"tap") 
         buf2 = gemm('N', 'T', h_neg-abs2(h_neg), v_neg-abs2(v_neg)) .* rbm.W  
-        axpy!(-lr, buf2, dW)
+        axpy!(-lr, buf2, rbm.dW)
     end
 
     if approx == "tap3"
         buf3 = gemm('N','T', (h_neg-abs2(h_neg)) .* (0.5-h_neg), (v_neg-abs2(v_neg)) .* (0.5-v_neg)) .* rbm.W2
-        axpy!(-2.0*lr, buf3, dW)  
+        axpy!(-2.0*lr, buf3, rbm.dW)  
     end  
 
     # rbm.W += rbm.momentum * rbm.dW_prev
-    axpy!(rbm.momentum, rbm.dW_prev, dW)
+    axpy!(rbm.momentum, rbm.dW_prev, rbm.dW)
 
     # Apply Weight-Decay Penalty
     # rbm.W += -lr * L1-Penalty-Gradient
-    axpy!(-lr*decay_mag,sign(rbm.W),dW)
+    axpy!(-lr*decay_mag,sign(rbm.W),rbm.dW)
 
     # rbm.W += lr * dW
-    axpy!(1.0, dW, rbm.W)
+    axpy!(1.0, rbm.dW, rbm.W)
     if contains(approx,"tap")
         rbm.W2=rbm.W.*rbm.W
     end
@@ -508,7 +511,7 @@ function update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, deca
         rbm.W3=rbm.W2.*rbm.W
     end
     # save current dW
-    copy!(rbm.dW_prev, dW)
+    copy!(rbm.dW_prev, rbm.dW)
 end
 
 
@@ -534,7 +537,7 @@ function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; approx="C
         v_pos, h_pos, _, _ = gibbs(rbm, vis; n_times=1)
         # take negative samples from "fantasy particles"
         _, _, v_neg, h_neg = gibbs(rbm, rbm.persistent_chain_vis; n_times=n_gibbs)
-        rbm.persistent_chain_vis = v_neg
+        copy!(rbm.persistent_chain_vis,v_neg)
     else
         v_pos, h_pos, v_neg, h_neg = iter_mag_persist!(rbm, vis; n_times=n_gibbs, approx=approx)
     end    
@@ -588,7 +591,8 @@ features(rbm::RBM; transpose=true) = components(rbm, transpose)
 function fit(rbm::RBM, X::Mat{Float64};
              persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1,
              weight_decay="none",decay_magnitude=0.01,validation=[],
-             monitor_every=5,monitor_vis=false, approx="CD")
+             monitor_every=5,monitor_vis=false, approx="CD",
+             persistent_start=1)
 #=
 The core RBM training function. Learns the weights and biasings using 
 either standard Contrastive Divergence (CD) or Persistent CD, depending on
@@ -600,6 +604,9 @@ the user options.
 
 ### Optional Inputs
  - *persistent:* Whether or not to use persistent-CD [default=true]
+ - *persistent_start:* At which epoch to start using the persistent chains. Only
+                       applicable for the case that `persistent=true`.
+                       [default=1]
  - *lr:* Learning rate [default=0.1]
  - *n_iter:* Number of training epochs [default=10]
  - *batch_size:* Minibatch size [default=100]
@@ -668,14 +675,17 @@ the user options.
     end
     rbm.persistent_chain_hid = hid_means(rbm, rbm.persistent_chain_vis)
 
-
+    use_persistent = false
     for itr=1:n_iter
+        # Check to see if we can use persistence at this epoch
+        use_persistent = itr>=persistent_start ? persistent : false
+
         tic()
-        for i=1:n_batches
+        @showprogress 1 "Fitting Batches..." for i=1:n_batches
             batch = X[:, ((i-1)*batch_size + 1):min(i*batch_size, end)]
             batch = full(batch)
           
-            fit_batch!(rbm, batch; persistent=persistent, 
+            fit_batch!(rbm, batch; persistent=use_persistent, 
                                    n_gibbs=n_gibbs,
                                    weight_decay=weight_decay,
                                    decay_magnitude=decay_magnitude,
