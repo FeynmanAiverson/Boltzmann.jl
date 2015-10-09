@@ -3,6 +3,8 @@ module Boltzmann
 
 export RBM,
        BernoulliRBM,
+       Monitor,
+       Update!,
        GRBM,
        DBN,
        DAE,
@@ -22,7 +24,16 @@ export RBM,
        normalize,
        normalize!,
        normalize_samples,
-       normalize_samples!
+       normalize_samples!,
+       ShowMonitor,
+       SaveMonitor,
+       plot_scores,
+       plot_evolution,
+       plot_rf,
+       plot_chain,
+       plot_vbias,
+       plot_weightdist
+
 
 include("core.jl")
 

@@ -23,7 +23,7 @@ function run_mnist()
     Xvars = sqrt(sum(X.^2,1))    
     X = sqrt(Nfeatures) * broadcast(/,X,Xvars)
 
-    m = GRBM(28*28, HiddenUnits; momentum=0.0, dataset=X)
+    m = GRBM(28*28, HiddenUnits, (28,28); momentum=0.0, dataset=X)
     
     # Attempt without weight decay
     info("Running With Gaussian Visible Units")
