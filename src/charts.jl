@@ -45,8 +45,10 @@ function plot_scores(mon::Monitor)
     ax_re = ax_pl[:twinx]()
     
     hpl = ax_pl[:plot](mon.Epochs,mon.PseudoLikelihood,"b^-",label="Pseudo-Likelihood")
+    htl = ax_pl[:plot](mon.Epochs,mon.TAPLikelihood,"g^-",label="Tap-Likelihood")
     if mon.UseValidation
         hvpl = ax_pl[:plot](mon.Epochs,mon.ValidationPseudoLikelihood,"b^:",label="Pseudo-Likelihood (Validation)")
+        hvtl = ax_pl[:plot](mon.Epochs,mon.ValidationTAPLikelihood,"g^:",label="Tap-Likelihood (Validation)")
     end
     ax_pl[:set_ylabel]("Normalized Likelihood")
     ax_pl[:set_ylim]((-0.3,0.0))
@@ -189,13 +191,16 @@ function ShowMonitor(rbm::RBM,mon::Monitor,itr::Int;filename=[])
         li = mon.LastIndex
         ce = mon.Epochs[li]
         if mon.UseValidation
-            @printf("[Epoch %04d] Train(pl : %0.3f), Valid(pl : %0.3f)  [%0.3f µsec/batch/unit]\n",ce,
+            @printf("[Epoch %04d] Train(pl : %0.3f, tl : %0.3f), Valid(pl : %0.3f, tl : %0.3f)  [%0.3f µsec/batch/unit]\n",ce,
                                                                                                    mon.PseudoLikelihood[li],
+                                                                                                   mon.TAPLikelihood[li],
                                                                                                    mon.ValidationPseudoLikelihood[li],
+                                                                                                   mon.ValidationTAPLikelihood[li],
                                                                                                    mon.BatchTime_µs[li])
         else
-            @printf("[Epoch %04d] Train(pl : %0.3f)  [%0.3f µsec/batch]\n",ce,
+            @printf("[Epoch %04d] Train(pl : %0.3f, tl : %0.3f)  [%0.3f µsec/batch]\n",ce,
                                                                            mon.PseudoLikelihood[li],
+                                                                           mon.TAPLikelihood[li],
                                                                            mon.BatchTime_µs[li])
         end
     end

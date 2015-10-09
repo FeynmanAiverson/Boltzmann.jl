@@ -42,7 +42,9 @@ end
     LearnRate::Vector{Float64}
     Momentum::Vector{Float64}
     PseudoLikelihood::Vector{Float64}
+    TAPLikelihood::Vector{Float64}
     ValidationPseudoLikelihood::Vector{Float64}
+    ValidationTAPLikelihood::Vector{Float64}
     ReconError::Vector{Float64}
     ValidationReconError::Vector{Float64}
     BatchTime_µs::Vector{Float64}
@@ -59,6 +61,8 @@ function Monitor(n_iter,monitor_every;monitor_vis=false,monitor_txt=true,validat
     blank_vector6 = copy(blank_vector1)
     blank_vector7 = copy(blank_vector1)
     blank_vector8 = copy(blank_vector1)
+    blank_vector9 = copy(blank_vector1)
+    blank_vector10 = copy(blank_vector1)
 
     if monitor_vis
         fh = plt.figure(1;figsize=(11,15))
@@ -75,10 +79,12 @@ function Monitor(n_iter,monitor_every;monitor_vis=false,monitor_txt=true,validat
             blank_vector2,       # Learn Rate
             blank_vector3,       # Momentum
             blank_vector4,       # Pseudo-Likelihood
-            blank_vector5,       # Validation Pseudo-Likelihood
-            blank_vector6,       # ReconError
-            blank_vector7,       # ValidationReconError
-            blank_vector8,       # BatchTime_µs
+            blank_vector5,       # Tap-Likelihood
+            blank_vector6,       # Validation Pseudo-Likelihood
+            blank_vector7,       # Validation  Tap-Likelihood
+            blank_vector8,       # ReconError
+            blank_vector9,       # ValidationReconError
+            blank_vector10,      # BatchTime_µs
             fh)                  # Monitor Figure Handle
 end
 
@@ -90,20 +96,25 @@ function UpdateMonitor!(rbm::RBM,mon::Monitor,dataset::Mat{Float64},itr::Int;val
     if itr%mon.MonitorEvery==0
         if mon.UseValidation 
             vpl = mean(score_samples(rbm, validation))/N
+            vtl = mean(score_samples_TAP(rbm, validation))/N
             vre = recon_error(rbm,validation)/N
         else
             vpl = NaN
+            vtl = NaN
             vre = NaN
         end
-        pl = mean(score_samples(rbm, dataset))/N      
+        pl = mean(score_samples(rbm, dataset))/N  
+        tl = mean(score_samples_TAP(rbm, dataset))/N    
         re = recon_error(rbm,dataset)/N
 
         mon.LastIndex+=1
         li = mon.LastIndex
 
         mon.PseudoLikelihood[li] = pl
+        mon.TAPLikelihood[li] = tl
         mon.ReconError[li] = re
         mon.ValidationPseudoLikelihood[li] = vpl
+        mon.ValidationTAPLikelihood[li] = vtl
         mon.ValidationReconError[li] = vre
         mon.Epochs[li] = itr
         mon.Momentum[li] = mo
@@ -244,11 +255,6 @@ end
 ### Base MF definitions
 #### Naive mean field
 function mag_vis_naive(rbm::RBM, m_hid::Mat{Float64}) ## to be constrained to being only Bernoulli
-    # print("naive")
-    # buf = rbm.W'*m_hid.+rbm.vbias
-    # buf = zeros(rbm.vbias)
-    # copy!(buf,rbm.vbias)
-    # gemm!('T', 'N', rbm.W, m_hid, 1.0, buf)
     buf = gemm('T', 'N', rbm.W, m_hid) .+ rbm.vbias
     return logistic(buf)
 end    
@@ -256,10 +262,6 @@ end
 mag_vis_naive(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64})=mag_vis_naive(rbm, m_hid) 
 
 function mag_hid_naive(rbm::RBM, m_vis::Mat{Float64}) 
-    # buf = rbm.W*m_vis.+rbm.hbias
-    # buf = zeros(rbm.hbias)
-    # copy!(buf,rbm.hbias)  
-    # gemm!('N', 'N', rbm.W, m_vis, 1.0, buf)
     buf = gemm('N', 'N', rbm.W, m_vis) .+ rbm.hbias
     return logistic(buf)
 end    
@@ -267,15 +269,8 @@ end
 mag_hid_naive(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64})=mag_hid_naive(rbm, m_vis) 
   
 #### Second order development
-
 function mag_vis_tap2(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64}) ## to be constrained to being only Bernoulli
-    # print("tap2")
-    # buf = rbm.W'*m_hid+rbm.vbias
-    # buf = zeros(rbm.vbias)
-    # copy!(buf,rbm.vbias)
-    # gemm!('T', 'N', rbm.W, m_hid, 1.0, buf)
     buf = gemm('T', 'N', rbm.W, m_hid) .+ rbm.vbias
-    # \sum_j w_ij(m_j-m_jˆ2)(0.5-m_i)
     second_order = gemm('T', 'N', rbm.W2, m_hid-abs2(m_hid)).*(0.5-m_vis)
     axpy!(1.0, second_order, buf)
     return logistic(buf)
@@ -291,12 +286,8 @@ end
 #### Third order development
 
 function mag_vis_tap3(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64}) ## to be constrained to being only Bernoulli
-    # print("tap3")
-    # buf = rbm.W'*m_hid+rbm.vbias
     buf = gemm('T', 'N', rbm.W, m_hid) .+ rbm.vbias
-    # \sum_j w_ijˆ2(m_j-m_jˆ2)(0.5-m_i)
     second_order = gemm('T', 'N', rbm.W2, m_hid-abs2(m_hid)).*(0.5-m_vis)
-    # \sum_j w_ijˆ3(1/3-2(m_i-m-iˆ2))(m_jˆ2-m_jˆ3)
     third_order = gemm('T', 'N', rbm.W3, abs2(m_hid).*(1.-m_hid)).*(1/3-2*(m_vis-abs2(m_vis)))
     axpy!(1.0, second_order, buf)
     axpy!(1.0, third_order, buf)
@@ -421,23 +412,21 @@ function score_samples_TAP(rbm::RBM, vis::Mat{Float64}; n_iter=5)
 end 
 
 function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr; approx="CD")
-    # print("no weight decay")
     dW = zeros(size(rbm.W))
-    # dW = pos - neg
+    # dW = lr * ( (h_pos * v_pos') - (h_neg * v_neg') )
     gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
     gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
 
-    #println("first order term   ",sum(dW)/(size(dW,1)*size(dW,2)))
     if contains(approx,"tap") 
         buf2 = gemm('N', 'T', h_neg-abs2(h_neg), v_neg-abs2(v_neg)) .* rbm.W  
         axpy!(-lr, buf2, dW)
-        #println("second order term  ",sum(buf2)/(size(dW,1)*size(dW,2)))
     end
+
     if approx == "tap3"
         buf3 = gemm('N','T', (h_neg-abs2(h_neg)) .* (0.5-h_neg), (v_neg-abs2(v_neg)) .* (0.5-v_neg)) .* rbm.W2
         axpy!(-2.0*lr, buf3, dW)  
-        #println("third order term  ",sum(buf3)/(size(dW,1)*size(dW,2)))
     end    
+
     # rbm.dW += rbm.momentum * rbm.dW_prev
     axpy!(rbm.momentum, rbm.dW_prev, dW)
     # rbm.W +=  dW
@@ -454,20 +443,20 @@ end
 
 function update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, decay_mag; approx="CD")
     dW = zeros(size(rbm.W))
-    # dW = (h_pos * v_pos') - (h_neg * v_neg')
+    
     gemm!('N', 'T', lr, h_neg, v_neg, 0.0, dW)
     gemm!('N', 'T', lr, h_pos, v_pos, -1.0, dW)
 
     if contains(approx,"tap") 
         buf2 = gemm('N', 'T', h_neg-abs2(h_neg), v_neg-abs2(v_neg)) .* rbm.W  
         axpy!(-lr, buf2, dW)
-        #println("second order term  ",sum(buf2)/(size(dW,1)*size(dW,2)))
     end
+
     if approx == "tap3"
         buf3 = gemm('N','T', (h_neg-abs2(h_neg)) .* (0.5-h_neg), (v_neg-abs2(v_neg)) .* (0.5-v_neg)) .* rbm.W2
         axpy!(-2.0*lr, buf3, dW)  
-        #println("third order term  ",sum(buf3)/(size(dW,1)*size(dW,2)))
     end  
+
     # rbm.W += rbm.momentum * rbm.dW_prev
     axpy!(rbm.momentum, rbm.dW_prev, dW)
 
@@ -496,12 +485,11 @@ function update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, deca
     if contains(approx,"tap") 
         buf2 = gemm('N', 'T', h_neg-abs2(h_neg), v_neg-abs2(v_neg)) .* rbm.W  
         axpy!(-lr, buf2, dW)
-        #println("second order term  ",sum(buf2)/(size(dW,1)*size(dW,2)))
     end
+
     if approx == "tap3"
         buf3 = gemm('N','T', (h_neg-abs2(h_neg)) .* (0.5-h_neg), (v_neg-abs2(v_neg)) .* (0.5-v_neg)) .* rbm.W2
         axpy!(-2.0*lr, buf3, dW)  
-        #println("third order term  ",sum(buf3)/(size(dW,1)*size(dW,2)))
     end  
 
     # rbm.W += rbm.momentum * rbm.dW_prev
@@ -525,7 +513,6 @@ end
 
 
 function contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; approx="CD")
-    # print("non_persistent")
     if approx == "CD"     
         v_pos, h_pos, v_neg, h_neg = gibbs(rbm, vis; n_times=n_gibbs)
     else
@@ -536,7 +523,6 @@ end
 
 
 function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; approx="CD")
-    # print("persistent")
     if size(rbm.persistent_chain_vis) != size(vis)
         # persistent_chain not initialized or batch size changed, re-initialize
         rbm.persistent_chain_vis = vis
@@ -551,10 +537,8 @@ function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; approx="C
         rbm.persistent_chain_vis = v_neg
     else
         v_pos, h_pos, v_neg, h_neg = iter_mag_persist!(rbm, vis; n_times=n_gibbs, approx=approx)
-        # rbm.persistent_chain_vis = v_neg
-        # rbm.persistent_chain_hid = h_neg
-
     end    
+
     return v_pos, h_pos, v_neg, h_neg
 end
 
@@ -661,7 +645,8 @@ the user options.
     info("  + Features:           $n_features")
     info("  + Hidden Units:       $n_hidden")
     info("  + Epochs to run:      $n_iter")
-    info("  + Persistent CD?:     $persistent")
+    info("  + Persistent ?:       $persistent")
+    info("  + Training approx:    $approx")
     info("  + Momentum:           $m_")
     info("  + Learning rate:      $lr")
     info("  + Gibbs Steps:        $n_gibbs")   
@@ -683,8 +668,7 @@ the user options.
     end
     rbm.persistent_chain_hid = hid_means(rbm, rbm.persistent_chain_vis)
 
-    pseudo_likelihood = zeros(n_iter,1)
-    tap_likelihood = zeros(n_iter,1)
+
     for itr=1:n_iter
         tic()
         for i=1:n_batches
@@ -698,12 +682,6 @@ the user options.
                                    lr=lr, approx=approx)
         end
         walltime_µs=(toq()/n_batches/N)*1e6
-        
-        pseudo = mean(score_samples(rbm, X))/(size(rbm.W)[1]+size(rbm.W)[2])
-        tap = mean(score_samples_TAP(rbm, X))/(size(rbm.W)[1]+size(rbm.W)[2])
-        println("Iteration #$itr, pseudo-likelihood = $pseudo, tap-likelihood = $tap")
-        pseudo_likelihood[itr] = pseudo
-        tap_likelihood[itr] = tap
 
         UpdateMonitor!(rbm,ProgressMonitor,X,itr;bt=walltime_µs,validation=validation)
         ShowMonitor(rbm,ProgressMonitor,itr)
