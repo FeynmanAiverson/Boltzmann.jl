@@ -1,8 +1,7 @@
-# include("testcharts.jl")
-# include("testrbm.jl")
-# include("testmomentum.jl")
-# include("testaccel.jl")
-# include("testnets.jl")
-# include("testweightdecay.jl")
+
+
+# info("Running Test: testmonitor.jl")
+# include("testmonitor.jl")
+
+info("Running Test: testTAP.jl")
 include("testTAP.jl")
-# include("testgaussianrbm.jl")

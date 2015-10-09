@@ -1,36 +1,34 @@
 
 using Boltzmann
 using MNIST
-using ImageView
-
-function plot_weights(W, imsize, padding=10)
-    h, w = imsize
-    n = size(W, 1)
-    rows = int(floor(sqrt(n)))
-    cols = int(ceil(n / rows))
-    halfpad = div(padding, 2)
-    dat = zeros(rows * (h + padding), cols * (w + padding))
-    for i=1:n
-        wt = W[i, :]
-        wim = reshape(wt, imsize)
-        wim = wim ./ (maximum(wim) - minimum(wim))
-        r = div(i - 1, cols) + 1
-        c = rem(i - 1, cols) + 1
-        dat[(r-1)*(h+padding)+halfpad+1 : r*(h+padding)-halfpad,
-            (c-1)*(w+padding)+halfpad+1 : c*(w+padding)-halfpad] = wim
-    end
-    view(dat)
-    return dat
-end
-
 
 function run_mnist()
-    X, y = testdata()  # test data is smaller, no need to downsample
-    X = X ./ (maximum(X) - minimum(X))
-    m = BernoulliRBM(28*28, 300)
-    fit(m, X)
-    plot_weights(m.W[1:64, :], (28, 28))
-    return m
+    # Set parameters
+    Epochs = 20
+    HiddenUnits = 256
+
+
+    # Get all MNIST training data
+    X, labels = traindata()  
+    binarize!(X)
+
+    # Split validation set
+    TrainSet = X[:,1:50000]
+    ValidSet = X[:,50001:end]
+
+    # Initialize Model
+    m = BernoulliRBM(28*28, HiddenUnits; momentum=0.5, dataset=TrainSet)
+
+    # Run Training
+    fit(m, TrainSet; n_iter=Epochs, 
+                     lr=0.005, 
+                     weight_decay="l2",
+                     decay_magnitude=0.01,
+                     persistent=true,
+                     validation=ValidSet)
+
+    # Display Result
+    chart_weights(m.W,(28,28))
 end
 
 run_mnist()
