@@ -10,11 +10,11 @@ X = rand(100, 2000)
 y = rand(2000)
 
 # construct and train DBN
-dbn_layers = [("vis", GRBM(100, 50)),
-              ("hid1", BernoulliRBM(50, 25)),
-              ("hid2", BernoulliRBM(25, 20))]
+dbn_layers = [("vis", GRBM(100, 50,(100,1))),
+              ("hid1", BernoulliRBM(50, 25,(50,1))),
+              ("hid2", BernoulliRBM(25, 20,(25,1)))]
 dbn = DBN(dbn_layers)
-fit(dbn, X)
+fit(dbn, X, approx="tap2")
 
 # save learn parameters (weights and biases)
 if isfile(DBN_PATH)
@@ -43,4 +43,4 @@ h5open(DBN_PATH) do h5
     #  load_network(h5, net, die_if_not_found=false) 
 end
 
-rm(DBN_PATH)
+# rm(DBN_PATH)
