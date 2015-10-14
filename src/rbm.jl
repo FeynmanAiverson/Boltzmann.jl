@@ -4,6 +4,7 @@ using ProgressMeter
 using Base.LinAlg.BLAS
 using Compat
 using Devectorize
+using HDF5
 using PyCall
 @pyimport matplotlib.pyplot as plt
 
@@ -125,6 +126,29 @@ function UpdateMonitor!(rbm::RBM,mon::Monitor,dataset::Mat{Float64},itr::Int;val
         mon.BatchTime_µs[li] = bt
     end 
 end
+
+
+function SaveMonitorh5(mon::Monitor,filename::AbstractString)
+    h5open(filename , "w") do file
+        # write(file, "LastIndex", mon.LastIndex)
+        # write(file, "UseValidation", mon.UseValidation)
+        write(file, "MonitorEvery", mon.MonitorEvery)
+        # write(file, "MonitorVisual", mon.MonitorVisual)
+        # write(file, "MonitorText", mon.MonitorText)
+        write(file, "Epochs", mon.Epochs)
+        write(file, "LearnRate", mon.LearnRate)
+        write(file, "Momentum", mon.Momentum)
+        write(file, "PseudoLikelihood", mon.PseudoLikelihood)
+        write(file, "TAPLikelihood", mon.TAPLikelihood)
+        write(file, "ValidationPseudoLikelihood", mon.ValidationPseudoLikelihood)
+        write(file, "ValidationTAPLikelihood", mon.ValidationTAPLikelihood)
+        write(file, "ReconError", mon.ReconError)
+        write(file, "ValidationReconError", mon.ValidationReconError)
+        write(file, "BatchTime_µs", mon.BatchTime_µs)
+        # write(file, "FigureHandle", mon.FigureHandle)
+    end 
+end  
+
 
 function RBM(V::Type, H::Type,
              n_vis::Int, n_hid::Int,

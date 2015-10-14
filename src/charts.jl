@@ -145,6 +145,8 @@ function SaveMonitor(rbm::RBM,mon::Monitor,filename::AbstractString)
 end
 
 
+
+
 function ShowMonitor(rbm::RBM,mon::Monitor,itr::Int;filename=[])
     fig = mon.FigureHandle
 
