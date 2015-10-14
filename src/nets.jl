@@ -55,9 +55,7 @@ end
 
 
 function fit(dbn::DBN, X::Mat{Float64};
-             persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1,
-             weight_decay="none",decay_magnitude=0.01,
-             approx="tap2")
+             lr=0.1, n_iter=10, batch_size=100, n_gibbs=1)
     @assert minimum(X) >= 0 && maximum(X) <= 1
     n_samples = size(X,2)
     n_batches = round(Int, ceil(n_samples / batch_size))
@@ -68,9 +66,7 @@ function fit(dbn::DBN, X::Mat{Float64};
             for i=1:n_batches
                 batch = X[:, ((i-1)*batch_size + 1):min(i*batch_size, end)]
                 input = k == 1 ? batch : mh_at_layer(dbn, batch, k-1)
-                fit_batch!(dbn[k], input, 
-                            persistent=persistent, lr=lr, n_gibbs=n_gibbs,
-                            weight_decay=weight_decay, decay_magnitude=decay_magnitude, approx=approx)
+                fit_batch!(dbn[k], input, buf=w_buf, n_gibbs=n_gibbs)
             end
         end
     end
