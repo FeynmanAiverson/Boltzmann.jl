@@ -1,7 +1,3 @@
-using Images
-# using Colors
-# using ImageView
-# using Gadfly
 using PyCall
 @pyimport matplotlib.pyplot as plt
 
@@ -30,11 +26,6 @@ function chart_weights(W, imsize; padding=0, annotation="", filename="", noshow=
     end
 
     normalize!(dat)
-
-    # Write to file
-    if length(filename) > 0
-        Images.imwrite(dat,filename,quality=100)
-    end
 
     return dat
 end
