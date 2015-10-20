@@ -423,7 +423,7 @@ function recon_error(rbm::RBM, vis::Mat{Float64})
     return mse
 end
 
-function score_samples_TAP(rbm::RBM, vis::Mat{Float64}; n_iter=5)
+function score_samples_TAP(rbm::RBM, vis::Mat{Float64}; n_iter=30)
     _, _, m_vis, m_hid = iter_mag(rbm, vis; n_times=n_iter, approx="tap2")
     eps=1e-6
     m_vis = max(m_vis, eps)
@@ -431,47 +431,17 @@ function score_samples_TAP(rbm::RBM, vis::Mat{Float64}; n_iter=5)
     m_hid = max(m_hid, eps)
     m_hid = min(m_hid, 1.0-eps)
 
+    m_vis2 = abs2(m_vis)
+    m_hid2 = abs2(m_hid)
+
     S = - sum(m_vis.*log(m_vis)+(1.0-m_vis).*log(1.0-m_vis),1) - sum(m_hid.*log(m_hid)+(1.0-m_hid).*log(1.0-m_hid),1)
     U_naive = - gemv('T',m_vis,rbm.vbias)' - gemv('T',m_hid,rbm.hbias)' - sum(gemm('N','N',rbm.W,m_vis).*m_hid,1)
-    Onsager = - 0.5 * sum(gemm('N','N',rbm.W2,m_vis-abs2(m_vis)).*(m_hid-abs2(m_hid)),1)    
+    Onsager = - 0.5 * sum(gemm('N','N',rbm.W2,m_vis-m_vis2).*(m_hid-m_hid2),1)    
     fe_tap = U_naive + Onsager - S
     fe = free_energy(rbm, vis)
     return fe_tap - fe
 end 
 
-function score_samples_TAP_python(rbm, vis; n_iter=5)
-    W=rbm.W
-    vbias=rbm.vbias
-    hbias=rbm.hbias
-    m_vis = vis
-    m_hid = hid_means(rbm, vis) 
-
-    for k=1:n_iter
-        m_vis = 0.5 * mag_vis_tap2(rbm, m_vis, m_hid) + 0.5 * m_vis
-        m_hid = 0.5 * mag_hid_tap2(rbm, m_vis, m_hid) + 0.5 * m_hid
-    end     
-    eps=1e-6
-    m_vis = max(m_vis, eps)
-    m_vis = min(m_vis, 1.0-eps)
-    m_hid = max(m_hid, eps)
-    m_hid = min(m_hid, 1.0-eps)
-
-    mv = m_vis'
-    mh = m_hid'
-    visbiases = vbias'
-    hidbiases = hbias'
-    vishid = W'
-    numdims, numcases = size(m_vis)
-    numhid = size(m_hid,1)
-    data = vis'
-
-    F =   sum(mv.*log(mv) + (1.-mv).*log(1.-mv)) .+ sum(mh.*log(mh) +(1-mh).*log(1-mh)) - sum(np.dot(visbiases,mv')) - sum(np.dot(hidbiases,mh'))  - np.einsum("ij,jk,ik",mv,vishid,mh) - 0.5*np.einsum("ij,jk,ik",mv.*(1-mv),vishid.^2,mh.*(1-mh))
-    F= F/(numcases*(numhid+numdims))
-    Fv=(-sum(np.dot(visbiases,data'))-sum(log(1+exp(np.dot(data,vishid) + np.tile(hidbiases,(numcases,1))))))/(numcases*(numhid+numdims))
-    lnP=-Fv+F
-
-    return lnP
-end 
 
 function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr; approx="CD")
     # dW = zeros(size(rbm.W))
@@ -493,9 +463,8 @@ function update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr; approx="CD")
     axpy!(rbm.momentum, rbm.dW_prev, rbm.dW)
     # rbm.W +=  dW
     axpy!(1.0, rbm.dW, rbm.W)
-    if contains(approx,"tap")
-        rbm.W2=rbm.W.*rbm.W
-    end
+    rbm.W2=rbm.W.*rbm.W
+    
     if approx == "tap3"
         rbm.W3=rbm.W2.*rbm.W
     end
@@ -528,9 +497,9 @@ function update_weights_QuadraticPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, d
 
     # rbm.W +=  dW
     axpy!(1.0, rbm.dW, rbm.W)
-    if contains(approx,"tap")
-        rbm.W2=rbm.W.*rbm.W
-    end
+   
+    rbm.W2=rbm.W.*rbm.W
+    
     if approx == "tap3"
         rbm.W3=rbm.W2.*rbm.W
     end
@@ -563,9 +532,9 @@ function update_weights_LinearPenalty!(rbm, h_pos, v_pos, h_neg, v_neg, lr, deca
 
     # rbm.W += lr * dW
     axpy!(1.0, rbm.dW, rbm.W)
-    if contains(approx,"tap")
-        rbm.W2=rbm.W.*rbm.W
-    end
+    
+    rbm.W2=rbm.W.*rbm.W
+    
     if approx == "tap3"
         rbm.W3=rbm.W2.*rbm.W
     end
@@ -752,9 +721,7 @@ the user options.
             
         end
         walltime_µs=(toq()/n_batches/N)*1e6
-
-        F=round(score_samples_TAP_python(rbm, X[:,1:5000] ; n_iter=5),4)
-        println("Computed with python tap likelihood : $F")
+        
         UpdateMonitor!(rbm,ProgressMonitor,X,itr;bt=walltime_µs,validation=validation)
         ShowMonitor(rbm,ProgressMonitor,itr)
     end
