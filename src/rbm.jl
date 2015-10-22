@@ -272,7 +272,7 @@ function gibbs(rbm::RBM, vis::Mat{Float64}; n_times=1)
         h_samp, h_neg = sample_hiddens(rbm, v_neg)
         for i=1:n_times-1
             v_neg = sample_visibles(rbm, h_samp)
-            h_neg = sample_hiddens(rbm, v_neg)
+            h_samp, h_neg = sample_hiddens(rbm, v_neg)
         end
     end
     return v_pos, h_pos, v_neg, h_neg
