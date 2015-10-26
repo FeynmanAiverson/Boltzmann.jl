@@ -76,3 +76,14 @@ BernoulliRBM(n_vis::Int, n_hid::Int, visshape::Tuple{Int,Int}; sigma=0.1, moment
 typealias GRBM RBM{Gaussian, Bernoulli}
 GRBM(n_vis::Int, n_hid::Int, visshape::Tuple{Int,Int}; sigma=0.1, momentum=0.0, dataset=[]) =
     RBM(Gaussian, Bernoulli, n_vis, n_hid, visshape; sigma=sigma, momentum=momentum, dataset=dataset)
+
+
+function hid_means(rbm::RBM, vis::Mat{Float64})
+    p = rbm.W * vis .+ rbm.hbias
+    return logsig(p)
+end
+
+function vis_means(rbm::RBM, hid::Mat{Float64})
+    p = rbm.W' * hid .+ rbm.vbias
+    return logsig(p)
+end
