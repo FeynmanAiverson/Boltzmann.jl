@@ -9,30 +9,7 @@ using PyCall
 @pyimport matplotlib.pyplot as plt
 @pyimport numpy as np
 
-
-# import Base.getindex
 import StatsBase.fit
-
-# typealias Mat{T} AbstractArray{T, 2}
-# typealias Vec{T} AbstractArray{T, 1}
-
-# typealias Gaussian Normal
-
-# abstract AbstractRBM
-
-# @runonce type RBM{V,H} <: AbstractRBM
-#     W::Matrix{Float64}
-#     W2::Matrix{Float64}
-#     W3::Matrix{Float64}
-#     vbias::Vector{Float64}
-#     hbias::Vector{Float64}
-#     dW::Matrix{Float64}
-#     dW_prev::Matrix{Float64}
-#     persistent_chain_vis::Matrix{Float64}
-#     persistent_chain_hid::Matrix{Float64}
-#     momentum::Float64
-#     VisShape::Tuple{Int,Int}
-# end
 
 abstract AbstractMonitor
 @runonce type Monitor <: AbstractMonitor
@@ -151,82 +128,15 @@ function SaveMonitorh5(mon::Monitor,filename::AbstractString)
 end  
 
 
-# function RBM(V::Type, H::Type,
-#              n_vis::Int, n_hid::Int,
-#              visshape::Tuple{Int,Int}; sigma=0.1, momentum=0.0, dataset=[])
-
-#     W = rand(Normal(0, sigma), (n_hid, n_vis))
-
-
-#     if isempty(dataset)
-#         RBM{V,H}(W,                                             # W
-# 				 W.*W,							                # W2
-# 				 W.*W.*W,							            # W3
-#                  zeros(n_vis),                                  # vbias
-#                  zeros(n_hid),                                  # hbias
-#                  zeros(n_hid, n_vis),                           # dW
-#                  zeros(n_hid, n_vis),                           # dW_prev
-#                  Array(Float64, 0, 0),                          # persistent_chain_vis
-#                  Array(Float64, 0, 0),                          # persistent_chain_hid
-#                  momentum,                                      # momentum
-#                  visshape)                                      # Shape of the visible units (for display)
-#     else
-#         ProbVis = mean(dataset,2)   # Mean across samples
-#         ProbVis = max(ProbVis,1e-8)
-#         ProbVis = min(ProbVis,1 - 1e-8)
-#         @devec InitVis = log(ProbVis ./ (1-ProbVis))
-
-#      	RBM{V,H}(W,   		                                    # W
-# 				 W.*W,							                # W2
-# 				 W.*W.*W,							            # W3
-#                  vec(InitVis),                                  # vbias
-#                  zeros(n_hid),                                  # hbias
-#                  zeros(n_hid, n_vis),                           # dW
-#                  zeros(n_hid, n_vis),                           # dW_prev
-#                  Array(Float64, 0, 0),                          # persistent_chain_vis
-#                  Array(Float64, 0, 0),                          # persistent_chain_hid
-#                  momentum,                                      # momentum
-#                  visshape)                                      # Shape of the visible units (for display)
-#     end
-# end
-
-
-# function Base.show{V,H}(io::IO, rbm::RBM{V,H})
-#     n_vis = size(rbm.vbias, 1)
-#     n_hid = size(rbm.hbias, 1)
-#     print(io, "RBM{$V,$H}($n_vis, $n_hid)")
-# end
-
-
-# typealias BernoulliRBM RBM{Bernoulli, Bernoulli}
-# BernoulliRBM(n_vis::Int, n_hid::Int, visshape::Tuple{Int,Int}; sigma=0.1, momentum=0.0, dataset=[]) =
-#     RBM(Bernoulli, Bernoulli, n_vis, n_hid, visshape; sigma=sigma, momentum=momentum, dataset=dataset)
-# typealias GRBM RBM{Gaussian, Bernoulli}
-# GRBM(n_vis::Int, n_hid::Int, visshape::Tuple{Int,Int}; sigma=0.1, momentum=0.0, dataset=[]) =
-#     RBM(Gaussian, Bernoulli, n_vis, n_hid, visshape; sigma=sigma, momentum=momentum, dataset=dataset)
-
-
 ### Base Definitions
-function logistic(x::Mat{Float64})
-    ## Using Devectorize Macro
-    @devec s = 1 ./ (1 + exp(-x))
-    return s
-end
-
-function logistic(x::Vec{Float64})
-    ## Using Devectorize Macro
-    @devec s = 1 ./ (1 + exp(-x))
-    return s
-end
-
 function hid_means(rbm::RBM, vis::Mat{Float64})
     p = rbm.W * vis .+ rbm.hbias
-    return logistic(p)
+    return logsig(p)
 end
 
 function vis_means(rbm::RBM, hid::Mat{Float64})
     p = rbm.W' * hid .+ rbm.vbias
-    return logistic(p)
+    return logsig(p)
 end
 
 function sample(::Type{Bernoulli}, means::Mat{Float64})
@@ -284,14 +194,14 @@ end
 #### Naive mean field
 function mag_vis_naive(rbm::RBM, m_hid::Mat{Float64}) ## to be constrained to being only Bernoulli
     buf = gemm('T', 'N', rbm.W, m_hid) .+ rbm.vbias
-    return logistic(buf)
+    return logsig(buf)
 end    
 # Defining a method with same arguments as other mean field approxiamtions
 mag_vis_naive(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64})=mag_vis_naive(rbm, m_hid) 
 
 function mag_hid_naive(rbm::RBM, m_vis::Mat{Float64}) 
     buf = gemm('N', 'N', rbm.W, m_vis) .+ rbm.hbias
-    return logistic(buf)
+    return logsig(buf)
 end    
 
 mag_hid_naive(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64})=mag_hid_naive(rbm, m_vis) 
@@ -301,14 +211,14 @@ function mag_vis_tap2(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64}) ## to 
     buf = gemm('T', 'N', rbm.W, m_hid) .+ rbm.vbias
     second_order = gemm('T', 'N', rbm.W2, m_hid-abs2(m_hid)).*(0.5-m_vis)
     axpy!(1.0, second_order, buf)
-    return logistic(buf)
+    return logsig(buf)
 end  
 
 function mag_hid_tap2(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64})
     buf = gemm('N', 'N', rbm.W, m_vis) .+ rbm.hbias
     second_order = gemm('N', 'N', rbm.W2, m_vis-abs2(m_vis)).*(0.5-m_hid)
     axpy!(1.0, second_order, buf)
-    return logistic(buf)
+    return logsig(buf)
 end
 
 #### Third order development
@@ -319,7 +229,7 @@ function mag_vis_tap3(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64}) ## to 
     third_order = gemm('T', 'N', rbm.W3, abs2(m_hid).*(1.-m_hid)).*(1/3-2*(m_vis-abs2(m_vis)))
     axpy!(1.0, second_order, buf)
     axpy!(1.0, third_order, buf)
-    return logistic(buf)
+    return logsig(buf)
 end  
 
 function mag_hid_tap3(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64})
@@ -328,7 +238,7 @@ function mag_hid_tap3(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64})
     third_order = gemm('N', 'N', rbm.W3, abs2(m_vis).*(1.-m_vis)).*(1/3-2*(m_hid-abs2(m_hid)))
     axpy!(1.0, second_order, buf)
     axpy!(1.0, third_order, buf)
-    return logistic(buf)
+    return logsig(buf)
 end
 
 
@@ -410,7 +320,7 @@ function score_samples(rbm::RBM, vis::Mat{Float64}; sample_size=10000)
     end
     fe = free_energy(rbm, vis)
     fe_corrupted = free_energy(rbm, vis_corrupted)
-    return n_feat * log(logistic(fe_corrupted - fe))
+    return n_feat * log(logsig(fe_corrupted - fe))
 end
 
 function recon_error(rbm::RBM, vis::Mat{Float64})

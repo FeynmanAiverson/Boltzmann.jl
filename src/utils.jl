@@ -1,4 +1,4 @@
-
+using Devectorize
 
 if !isdefined(:__EXPRESSION_HASHES__)
     __EXPRESSION_HASHES__ = Set{Uint64}()
@@ -17,6 +17,7 @@ end
 typealias Mat{T} AbstractArray{T, 2}
 typealias Vec{T} AbstractArray{T, 1}
 
+## Normalizing data to the range [0,1]
 function normalize_samples(X)
     samples = size(X,2)
 
@@ -65,6 +66,7 @@ function normalize(x)
     return x
 end
 
+## Convert real data to binary data
 function binarize!(x;level=0.001)
   @simd for i=1:length(x)
     @inbounds x[i] = x[i] > level ? 1.0 : 0.0
@@ -72,8 +74,29 @@ function binarize!(x;level=0.001)
 end
 
 function binarize(x;level=0.001)
+  s = copy(x)
   @simd for i=1:length(x)
-    @inbounds x[i] = x[i] > level ? 1.0 : 0.0
+    @inbounds s[i] = x[i] > level ? 1.0 : 0.0
   end
-  return x
+  return s
 end
+
+### Logistic Sigmoid in various forms
+function logsig(x::Mat{Float64})
+    @devec s = 1 ./ (1 + exp(-x))
+    return s
+end
+
+function logsig!(x::Mat{Float64})
+    @devec x = 1 ./ (1 + exp(-x))
+end
+
+function logsig(x::Vec{Float64})
+    @devec s = 1 ./ (1 + exp(-x))
+    return s
+end
+
+function logsig!(x::Vec{Float64})
+    @devec x = 1 ./ (1 + exp(-x))
+end
+
