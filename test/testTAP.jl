@@ -4,18 +4,14 @@ using Base.Test
 using HDF5
 
 function run_mnist()
-    X, y = traindata()  # test data is smaller, no need to downsample
+    X, y = testdata()  # test data is smaller, no need to downsample
     normalize_samples!(X)
     binarize!(X;level=0.2)
 
-
-
-    # TrainSet = X
-    # ValidSet = []
-    TrainSet = X[:,1:59000]
-    ValidSet = X[:,59001:end]
+    TrainSet = X[:,1:5000]
+    ValidSet = X[:,5001:end]
     HiddenUnits = 500;
-    Epochs = 50;
+    Epochs = 10;
     Gibbs = 1;
     IterMag = 3
     LearnRate = 0.005
@@ -71,47 +67,6 @@ function run_mnist()
 
     SaveMonitor(finalrbmCD,monitor,"testmonitor_CD.pdf")
     SaveMonitorh5(monitor,"testmonitor_CD.h5")
-
-
-h5open("finalrbms2.h5","w") do file
-  write(file,"WRBMtap2",finalrbmtap2.W)
-  write(file,"hbRBMtap2",finalrbmtap2.hbias)
-  write(file,"vbRBMtap2",finalrbmtap2.vbias)
-  write(file,"WRBMCD",finalrbmCD.W)
-  write(file,"hbRBMCD",finalrbmCD.hbias)
-  write(file,"vbRBMCD",finalrbmCD.vbias)
-  write(file,"WRBMnaive",finalrbmnaive.W)
-  write(file,"hbRBMnaive",finalrbmnaive.hbias)
-  write(file,"vbRBMnaive",finalrbmnaive.vbias)
-end
-
 end
 
 run_mnist()
-
-
-
-
-##### Piece of code to compare the TAP likelihood at the end of training
-
-# Epochs = h5open("testmonitor_CD.h5","r") do file 
-#           read(file, "Epochs")
-#         end
-
-# CD_tl = h5open("testmonitor_CD.h5","r") do file 
-#           read(file, "TAPLikelihood")
-#         end
-# tap2_tl = h5open("testmonitor_tap2.h5","r") do file 
-#           read(file, "TAPLikelihood")
-#         end
-
-# naive_tl = h5open("testmonitor_CD.h5","r") do file 
-#           read(file, "TAPLikelihood")
-#         end        
-
-# plt.figure()
-# plt.plot(Epochs, CD_tl, "d-", label="CD")
-# plt.plot(Epochs, tap2_tl, "^-",label="tap2")
-# plt.plot(Epochs, naive_tl, "*-" , label="naive")
-# plt.legend()
-# plt.show()
