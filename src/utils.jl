@@ -14,6 +14,9 @@ macro runonce(expr)
     end)
 end
 
+typealias Mat{T} AbstractArray{T, 2}
+typealias Vec{T} AbstractArray{T, 1}
+
 function normalize_samples(X)
     samples = size(X,2)
 
