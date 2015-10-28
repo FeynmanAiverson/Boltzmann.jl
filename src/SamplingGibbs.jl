@@ -1,3 +1,6 @@
+using Distributions
+using Base.LinAlg.BLAS
+
 function sample(::Type{Bernoulli}, means::Mat{Float64})
     s = zeros(means)
     r = rand(size(means))
@@ -29,7 +32,6 @@ end
 
 
 function gibbs(rbm::RBM, vis::Mat{Float64}; n_times=1)
-    #print("gibbs")
     v_pos = vis
     h_samp, h_pos = sample_hiddens(rbm, v_pos)
     h_neg = Array(Float64,0,0)::Mat{Float64}
