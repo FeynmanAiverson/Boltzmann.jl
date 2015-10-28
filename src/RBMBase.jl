@@ -63,25 +63,34 @@ end
 typealias BernoulliRBM RBM{Bernoulli, Bernoulli}
 BernoulliRBM(n_vis::Int, n_hid::Int, visshape::Tuple{Int,Int}; sigma=0.1, momentum=0.0, dataset=[]) =
     RBM(Bernoulli, Bernoulli, n_vis, n_hid, visshape; sigma=sigma, momentum=momentum, dataset=dataset)
+
 typealias GRBM RBM{Gaussian, Bernoulli}
 GRBM(n_vis::Int, n_hid::Int, visshape::Tuple{Int,Int}; sigma=0.1, momentum=0.0, dataset=[]) =
     RBM(Gaussian, Bernoulli, n_vis, n_hid, visshape; sigma=sigma, momentum=momentum, dataset=dataset)
 
 
-function hid_means(rbm::RBM, vis::Mat{Float64})
-    p = rbm.W * vis .+ rbm.hbias
-    return logsig(p)
+function PassHidToVis(rbm::RBM, hid::Mat{Float64})
+    return rbm.W' * hid .+ rbm.vbias
 end
 
-function vis_means(rbm::RBM, hid::Mat{Float64})
-    p = rbm.W' * hid .+ rbm.vbias
-    return logsig(p)
+function PassVisToHid(rbm::RBM, vis::Mat{Float64})
+    return rbm.W * vis .+ rbm.hbias
 end
+
+### These functions need to be generalized to detect the Distribution on 
+### the hidden and visible variables.
+function ProbHidCondOnVis(rbm::RBM, vis::Mat{Float64})
+    return logsig(PassVisToHid(rbm,vis))
+end
+
+function ProbVisCondOnHid(rbm::RBM, hid::Mat{Float64})
+    return logsig(PassHidToVis(rbm,hid))
+end
+
 
 function transform(rbm::RBM, X::Mat{Float64})
     return hid_means(rbm, X)
 end
-
 
 function generate(rbm::RBM, vis::Vec{Float64}; n_gibbs=1)
     return gibbs(rbm, reshape(vis, length(vis), 1); n_times=n_gibbs)[3]

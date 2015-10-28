@@ -122,12 +122,11 @@ end
 
 
 function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; approx="CD")
-    if size(rbm.persistent_chain_vis) != size(vis)
-        # persistent_chain not initialized or batch size changed, re-initialize
-        rbm.persistent_chain_vis = vis
-        rbm.persistent_chain_hid = hid_means(rbm, vis)
-    end
-
+    # if size(rbm.persistent_chain_vis) != size(vis)
+    #     # persistent_chain not initialized or batch size changed, re-initialize
+    #     rbm.persistent_chain_vis = vis
+    #     rbm.persistent_chain_hid = ProbHidCondOnVis(rbm, vis)
+    # end
     if approx == "CD"
         # take positive samples from real data
         v_pos, h_pos, _, _ = gibbs(rbm, vis; n_times=1)
@@ -146,8 +145,30 @@ function fit_batch!(rbm::RBM, vis::Mat{Float64};
                     persistent=true, lr=0.1, n_gibbs=1,
                     weight_decay="none",decay_magnitude=0.01, approx="CD")
     
-    sampler = persistent ? persistent_contdiv : contdiv
-    v_pos, h_pos, v_neg, h_neg = sampler(rbm, vis, n_gibbs; approx=approx)
+    # Determine how to acquire the positive samples based upon the 
+    # persistence mode.
+    if persistent
+        if size(rbm.persistent_chain_vis) != size(vis)
+            # If the persistent chains were not already intialized, 
+            # do so now.
+            rbm.persistent_chain_vis = vis
+            rbm.persistent_chain_hid = ProbHidCondOnVis(rbm,vis)
+        end
+        # Positive ("starting points") come form the chain
+        v_pos = rbm.persistent_chain_vis
+        h_pos = rbm.persistent_chain_hid
+        sampler = persistent_contdiv            # Set sampler function handle
+    else
+        v_pos = vis                             # Positive Visible come from batch samples
+        h_pos = ProbHidCondOnVis(rbm,vis)       # Positive Hidden are "data-clamped" activations 
+        sampler = contdiv                       # Set sampler function handle
+    end
+
+    # sampler = persistent ? persistent_contdiv : contdiv
+    # v_pos = persistent ? rbm.persistent_chain_vis : vis
+    # h_pos = persistent ? rbm.persistent_chain_hid : ProbHidCondOnVis(rbm,vis)
+
+    _, _, v_neg, h_neg = sampler(rbm, vis, n_gibbs; approx=approx)
 
     # Gradient Update on Weights
     if weight_decay=="l2"
@@ -249,7 +270,7 @@ the user options.
     for i=1:batch_size
         rbm.persistent_chain_vis[:,i] = X[:,p[i]]
     end
-    rbm.persistent_chain_hid = hid_means(rbm, rbm.persistent_chain_vis)
+    rbm.persistent_chain_hid = ProbHidCondOnVis(rbm, rbm.persistent_chain_vis)
 
     use_persistent = false
     for itr=1:n_iter

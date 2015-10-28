@@ -21,12 +21,12 @@ function sample(::Type{Gaussian}, means::Mat{Float64})
 end
     
 function sample_hiddens{V,H}(rbm::RBM{V,H}, vis::Mat{Float64})
-    means = hid_means(rbm, vis)
+    means = ProbHidCondOnVis(rbm, vis)
     return sample(H, means), means
 end
 
 function sample_visibles{V,H}(rbm::RBM{V,H}, hid::Mat{Float64})
-    means = vis_means(rbm, hid)
+    means = ProbVisCondOnHid(rbm, hid)
     return sample(V, means)
 end
 

@@ -26,7 +26,7 @@ end
 
 function recon_error(rbm::RBM, vis::Mat{Float64})
     # Fully forward MF operation to get back to visible samples
-    vis_rec = vis_means(rbm,hid_means(rbm,vis))
+    vis_rec = ProbVisCondOnHid(rbm,ProbHidCondOnVis(rbm,vis))
     # Get the total error over the whole tested visible set,
     # here, as MSE
     dif = vis_rec - vis
@@ -34,7 +34,7 @@ function recon_error(rbm::RBM, vis::Mat{Float64})
     return mse
 end
 
-function score_samples_TAP(rbm::RBM, vis::Mat{Float64}; n_iter=30)
+function score_samples_TAP(rbm::RBM, vis::Mat{Float64}; n_iter=5)
     _, _, m_vis, m_hid = iter_mag(rbm, vis; n_times=n_iter, approx="tap2")
     eps=1e-6
     m_vis = max(m_vis, eps)
