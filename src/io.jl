@@ -8,6 +8,12 @@ function save_params(file::HDF5File, rbm::RBM, name::String)
     write(file, "$(name)___bias", rbm.hbias)
 end
 
+function save_params(filename::HDF5File, rbm::RBM, name::String)
+    write(file, "$(name)___weight", rbm.W')
+    write(file, "$(name)___vbias", rbm.vbias)
+    write(file, "$(name)___bias", rbm.hbias)
+end
+
 function load_params(file::HDF5File, rbm::RBM, name::String)
     rbm.W = read(file, "$(name)___weight")'
     rbm.vbias = read(file, "$(name)___vbias")
