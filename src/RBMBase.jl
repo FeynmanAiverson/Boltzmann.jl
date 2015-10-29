@@ -1,7 +1,6 @@
 using Distributions
 using Base.LinAlg.BLAS
 using Devectorize
-
 import Base.getindex
 
 typealias Gaussian Normal
@@ -23,9 +22,9 @@ abstract AbstractRBM
 end
 
 
-function RBM(V::Type, H::Type,
-             n_vis::Int, n_hid::Int,
-             visshape::Tuple{Int,Int}; sigma=0.1, momentum=0.0, dataset=[])
+function RBM(V::Type, H::Type, n_vis::Int, n_hid::Int, visshape::Tuple{Int,Int}; sigma=0.1, 
+                                                                                 momentum=0.0, 
+                                                                                 dataset=[])
 
     W = rand(Normal(0, sigma), (n_hid, n_vis))
 
@@ -86,23 +85,3 @@ end
 function ProbVisCondOnHid(rbm::RBM, hid::Mat{Float64})
     return logsig(PassHidToVis(rbm,hid))
 end
-
-
-function transform(rbm::RBM, X::Mat{Float64})
-    return hid_means(rbm, X)
-end
-
-function generate(rbm::RBM, vis::Vec{Float64}; n_gibbs=1)
-    return gibbs(rbm, reshape(vis, length(vis), 1); n_times=n_gibbs)[3]
-end
-
-function generate(rbm::RBM, X::Mat{Float64}; n_gibbs=1)
-    return gibbs(rbm, X; n_times=n_gibbs)[3]
-end
-
-
-function components(rbm::RBM; transpose=true)
-    return if transpose rbm.W' else rbm.W end
-end
-# synonym
-features(rbm::RBM; transpose=true) = components(rbm, transpose)
