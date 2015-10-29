@@ -146,28 +146,21 @@ function fit_batch!(rbm::RBM, vis::Mat{Float64};
                     persistent=true, lr=0.1, n_gibbs=1,
                     weight_decay="none",decay_magnitude=0.01, approx="CD")
     
-    # Determine how to acquire the positive samples based upon the 
-    # persistence mode.
+    # Determine how to acquire the positive samples based upon the persistence mode.
     if persistent
         if size(rbm.persistent_chain_vis) != size(vis)
-            # If the persistent chains were not already intialized, 
-            # do so now.
+            # If the persistent chains were not already intialized, do so now.
             rbm.persistent_chain_vis = vis
             rbm.persistent_chain_hid = ProbHidCondOnVis(rbm,vis)
         end
-        # Positive ("starting points") come from the chain
-        v_pos = rbm.persistent_chain_vis
-        h_pos = rbm.persistent_chain_hid
+        v_pos = rbm.persistent_chain_vis        # Positive visible from chain
+        h_pos = rbm.persistent_chain_hid        # Positive hidden from chain
         sampler = persistent_contdiv            # Set sampler function handle
     else
         v_pos = vis                             # Positive Visible come from batch samples
         h_pos = ProbHidCondOnVis(rbm,vis)       # Positive Hidden are "data-clamped" activations 
         sampler = contdiv                       # Set sampler function handle
     end
-
-    # sampler = persistent ? persistent_contdiv : contdiv
-    # v_pos = persistent ? rbm.persistent_chain_vis : vis
-    # h_pos = persistent ? rbm.persistent_chain_hid : ProbHidCondOnVis(rbm,vis)
 
     _, _, v_neg, h_neg = sampler(rbm, vis, n_gibbs; approx=approx)
 
@@ -180,6 +173,7 @@ function fit_batch!(rbm::RBM, vis::Mat{Float64};
         update_weights!(rbm, h_pos, v_pos, h_neg, v_neg, lr, approx=approx)
     end
 
+    # Gradient update on biases
     rbm.hbias += vec(lr * (sum(h_pos, 2) - sum(h_neg, 2)))
     rbm.vbias += vec(lr * (sum(v_pos, 2) - sum(v_neg, 2)))
 
