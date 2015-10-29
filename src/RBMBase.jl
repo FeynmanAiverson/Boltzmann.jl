@@ -7,7 +7,30 @@ typealias Gaussian Normal
 
 ### Definition of the base RBM Structure
 abstract AbstractRBM
-@runonce type RBM{V,H} <: AbstractRBM
+
+"""
+    # Boltzmann.RBM{V,H} (RBMBase.jl)
+    ## Description
+        A structure for containing all of the restricted Boltzmann Machine (RBM)
+        model parameters. Besides just the model parameters (couplings, biases),
+        the structure also contains variables which are pertinent to the RBM training
+        procedure.
+
+    ## Structure
+        - `W::Matrix{Float64}`:       The matrix of coupling parameters (RBM model parameter)
+        - `W2::Matrix{Float64}`:      The square of `W` (used for EMF learning)
+        - `W3::Matrix{Float64}`:      The cube of `W` (used for EMF learning)
+        - `vbias::Vector{Float64}`:   The visible unit biases (RBM model parameter)
+        - `hbias::Vector{Float64}`:   The hidden unit biases (RBM model parameter)
+        - `dW::Matrix{Float64}`:      The current gradient on the coupling parameters (used for RBM training)
+        - `dW_prev::Matrix{Float64}`: The last gradient on the coupling parmaters (used for RBM training)
+        - `persistent_chain_vis::Matrix{Float64}`: Visible fantasy particles (used for RBM persistent mode training)
+        - `persistent_chain_hid::Matrix{Float64}`: Hidden fantasy particles (used for RBM persistent mode training)
+        - `momentum::Float64`:        Amount of last gradient to add to the current gradient (used for RBM training)
+        - `VisShape::Tuple{Int,Int}`: Final output shape of the visible units
+"""
+type RBM{V,H} <: AbstractRBM
+# @runonce type RBM{V,H} <: AbstractRBM
     W::Matrix{Float64}
     W2::Matrix{Float64}
     W3::Matrix{Float64}
@@ -22,9 +45,7 @@ abstract AbstractRBM
 end
 
 
-function RBM(V::Type, H::Type, n_vis::Int, n_hid::Int, visshape::Tuple{Int,Int}; sigma=0.1, 
-                                                                                 momentum=0.0, 
-                                                                                 dataset=[])
+function RBM(V::Type, H::Type, n_vis::Int, n_hid::Int, visshape::Tuple{Int,Int}; sigma=0.1, momentum=0.0, dataset=[])
 
     W = rand(Normal(0, sigma), (n_hid, n_vis))
 
@@ -68,20 +89,32 @@ GRBM(n_vis::Int, n_hid::Int, visshape::Tuple{Int,Int}; sigma=0.1, momentum=0.0, 
     RBM(Gaussian, Bernoulli, n_vis, n_hid, visshape; sigma=sigma, momentum=momentum, dataset=dataset)
 
 
+"""
+    # Boltzmann.PassHidToVis  (RBMBase.jl)
+"""
 function PassHidToVis(rbm::RBM, hid::Mat{Float64})
     return rbm.W' * hid .+ rbm.vbias
 end
 
+"""
+    # Boltzmann.PassVisToHid  (RBMBase.jl)
+"""
 function PassVisToHid(rbm::RBM, vis::Mat{Float64})
     return rbm.W * vis .+ rbm.hbias
 end
 
 ### These functions need to be generalized to detect the Distribution on 
 ### the hidden and visible variables.
+"""
+    # Boltzmann.ProbHidCondOnVis  (RBMBase.jl)
+"""
 function ProbHidCondOnVis(rbm::RBM, vis::Mat{Float64})
     return logsig(PassVisToHid(rbm,vis))
 end
 
+"""
+    # Boltzmann.ProbVisCondOnHid  (RBMBase.jl)
+"""
 function ProbVisCondOnHid(rbm::RBM, hid::Mat{Float64})
     return logsig(PassHidToVis(rbm,hid))
 end
