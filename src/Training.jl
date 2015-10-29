@@ -122,11 +122,6 @@ end
 
 
 function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; approx="CD")
-    # if size(rbm.persistent_chain_vis) != size(vis)
-    #     # persistent_chain not initialized or batch size changed, re-initialize
-    #     rbm.persistent_chain_vis = vis
-    #     rbm.persistent_chain_hid = ProbHidCondOnVis(rbm, vis)
-    # end
     if approx == "CD"
         # take positive samples from real data
         v_pos, h_pos, _, _ = gibbs(rbm, vis; n_times=1)
@@ -148,11 +143,6 @@ function fit_batch!(rbm::RBM, vis::Mat{Float64};
     
     # Determine how to acquire the positive samples based upon the persistence mode.
     if persistent
-        if size(rbm.persistent_chain_vis) != size(vis)
-            # If the persistent chains were not already intialized, do so now.
-            rbm.persistent_chain_vis = vis
-            rbm.persistent_chain_hid = ProbHidCondOnVis(rbm,vis)
-        end
         v_pos = rbm.persistent_chain_vis        # Positive visible from chain
         h_pos = rbm.persistent_chain_hid        # Positive hidden from chain
         sampler = persistent_contdiv            # Set sampler function handle
