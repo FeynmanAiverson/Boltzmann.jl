@@ -6,7 +6,7 @@ using HDF5
 function run_mnist()
     X, y = testdata()  # test data is smaller, no need to downsample
     normalize_samples!(X)
-    binarize!(X;level=0.2)
+    binarize!(X;threshold=0.01)
 
     TrainSet = X[:,1:5000]
     ValidSet = X[:,5001:end]
