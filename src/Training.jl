@@ -133,6 +133,7 @@ function persistent_contdiv(rbm::RBM, vis::Mat{Float64}, n_gibbs::Int; approx="C
         # take negative samples from "fantasy particles"
         _, _, v_neg, h_neg = gibbs(rbm, rbm.persistent_chain_vis; n_times=n_gibbs)
         copy!(rbm.persistent_chain_vis,v_neg)
+        copy!(rbm.persistent_chain_hid,h_neg)
     else
         v_pos, h_pos, v_neg, h_neg = iter_mag_persist!(rbm, vis; n_times=n_gibbs, approx=approx)
     end    
@@ -154,7 +155,7 @@ function fit_batch!(rbm::RBM, vis::Mat{Float64};
             rbm.persistent_chain_vis = vis
             rbm.persistent_chain_hid = ProbHidCondOnVis(rbm,vis)
         end
-        # Positive ("starting points") come form the chain
+        # Positive ("starting points") come from the chain
         v_pos = rbm.persistent_chain_vis
         h_pos = rbm.persistent_chain_hid
         sampler = persistent_contdiv            # Set sampler function handle
@@ -185,41 +186,50 @@ function fit_batch!(rbm::RBM, vis::Mat{Float64};
     return rbm
 end
 
+
+"""
+    # Boltzmann.fit (training.jl)
+    ## Function Call
+        `fit(rbm::RBM, X::Mat{Float64}[, persistent, lr, batch_size, n_gibbs, weight_decay, 
+                                         decay_magnitude, validation,monitor_ever, monitor_vis,
+                                         approx, persistent_start])`
+    ## Description
+    The core RBM training function. Learns the weights and biasings using 
+    either standard Contrastive Divergence (CD) or Persistent CD, depending on
+    the user options. 
+    
+    - *rbm:* RBM object, initialized by `RBM()`/`GRBM()`
+    - *X:* Set of training vectors
+
+    ### Optional Inputs
+     - *persistent:* Whether or not to use persistent-CD [default=true]
+     - *persistent_start:* At which epoch to start using the persistent chains. Only
+                           applicable for the case that `persistent=true`.
+                           [default=1]
+     - *lr:* Learning rate [default=0.1]
+     - *n_iter:* Number of training epochs [default=10]
+     - *batch_size:* Minibatch size [default=100]
+     - *n_gibbs:* Number of Gibbs sampling steps on the Markov Chain [default=1]
+     - *weight_decay:* A string value representing the regularization to add to apply to the 
+                       weight magnitude during training {"none","l1","l2"}. [default="none"]
+     - *decay_magnitude:* Relative importance assigned to the weight regularization. Smaller
+                          values represent less regularization. Should be in range (0,1). 
+                          [default=0.01]
+     - *validation:* An array of validation samples, e.g. a held out set of training data.
+                     If passed, `fit` will also track generalization progress during training.
+                     [default=empty-set]
+     - *score_every:* Controls at which epoch the progress of the fit is monitored. Useful to 
+                      speed up the fit procedure if detailed progress monitoring is not required.
+                      [default=5]
+
+    ## Returns
+"""
 function fit(rbm::RBM, X::Mat{Float64};
              persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1,
              weight_decay="none",decay_magnitude=0.01,validation=[],
              monitor_every=5,monitor_vis=false, approx="CD",
              persistent_start=1)
-#=
-The core RBM training function. Learns the weights and biasings using 
-either standard Contrastive Divergence (CD) or Persistent CD, depending on
-the user options. 
 
-### Required Inputs
-- *rbm:* RBM object, initialized by `RBM()`/`GRBM()`
-- *X:* Set of training vectors
-
-### Optional Inputs
- - *persistent:* Whether or not to use persistent-CD [default=true]
- - *persistent_start:* At which epoch to start using the persistent chains. Only
-                       applicable for the case that `persistent=true`.
-                       [default=1]
- - *lr:* Learning rate [default=0.1]
- - *n_iter:* Number of training epochs [default=10]
- - *batch_size:* Minibatch size [default=100]
- - *n_gibbs:* Number of Gibbs sampling steps on the Markov Chain [default=1]
- - *weight_decay:* A string value representing the regularization to add to apply to the 
-                   weight magnitude during training {"none","l1","l2"}. [default="none"]
- - *decay_magnitude:* Relative importance assigned to the weight regularization. Smaller
-                      values represent less regularization. Should be in range (0,1). 
-                      [default=0.01]
- - *validation:* An array of validation samples, e.g. a held out set of training data.
-                 If passed, `fit` will also track generalization progress during training.
-                 [default=empty-set]
- - *score_every:* Controls at which epoch the progress of the fit is monitored. Useful to 
-                  speed up the fit procedure if detailed progress monitoring is not required.
-                  [default=5]
-=#
     @assert minimum(X) >= 0 && maximum(X) <= 1
 
     n_valid=0

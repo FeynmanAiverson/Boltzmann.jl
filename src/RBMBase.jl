@@ -28,7 +28,6 @@ abstract AbstractRBM
         - `VisShape::Tuple{Int,Int}`: Final output shape of the visible units
 """
 type RBM{V,H} <: AbstractRBM
-# @runonce type RBM{V,H} <: AbstractRBM
     W::Matrix{Float64}
     W2::Matrix{Float64}
     W3::Matrix{Float64}
@@ -44,7 +43,6 @@ end
 
 
 function RBM(V::Type, H::Type, n_vis::Int, n_hid::Int, visshape::Tuple{Int,Int}; sigma=0.1, momentum=0.0, dataset=[])
-
     W = rand(Normal(0, sigma), (n_hid, n_vis))
 
     InitialVisBias = zeros(n_vis,1)
@@ -55,19 +53,17 @@ function RBM(V::Type, H::Type, n_vis::Int, n_hid::Int, visshape::Tuple{Int,Int};
         @devec InitialVisBias = log(ProbVis ./ (1-ProbVis))
     end
 
-    if isempty(dataset)
-        RBM{V,H}(W,                                             # W
-                 W.*W,                                          # W2
-                 W.*W.*W,                                       # W3
-                 vec(InitialVisBias),                           # vbias
-                 zeros(n_hid),                                  # hbias
-                 zeros(n_hid, n_vis),                           # dW
-                 zeros(n_hid, n_vis),                           # dW_prev
-                 Array(Float64, 0, 0),                          # persistent_chain_vis
-                 Array(Float64, 0, 0),                          # persistent_chain_hid
-                 momentum,                                      # momentum
-                 visshape)                                      # Shape of the visible units (for display)
-    end
+    RBM{V,H}(W,                                             # W
+             W.*W,                                          # W2
+             W.*W.*W,                                       # W3
+             vec(InitialVisBias),                           # vbias
+             zeros(n_hid),                                  # hbias
+             zeros(n_hid, n_vis),                           # dW
+             zeros(n_hid, n_vis),                           # dW_prev
+             Array(Float64, 0, 0),                          # persistent_chain_vis
+             Array(Float64, 0, 0),                          # persistent_chain_hid
+             momentum,                                      # momentum
+             visshape)                                      # Shape of the visible units (for display)
 end
 
 
