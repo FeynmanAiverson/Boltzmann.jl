@@ -4,8 +4,6 @@ using Devectorize
 import Base.getindex
 
 typealias Gaussian Normal
-
-### Definition of the base RBM Structure
 abstract AbstractRBM
 
 """

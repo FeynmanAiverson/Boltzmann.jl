@@ -8,7 +8,7 @@ using Base.Test
 function run_mnist()
     X, y = testdata()  # test data is smaller, no need to downsample
     normalize_samples!(X)
-    binarize!(X)
+    binarize!(X;threhold=0.01)
 
     TrainSet = X[:,1:9000]
     ValidSet = X[:,9001:end]
