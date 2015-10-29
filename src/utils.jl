@@ -44,47 +44,48 @@ typealias Vec{T} AbstractArray{T, 1}
   ### See also...
     `normalize_samples!`
 """
-function normalize_samples(X::Mat{Float64})
-    samples = size(X,2)
+function normalize_samples(x::Mat{Float64})
+    samples = size(x,2)
+    y = zeros(x)    
 
     for i=1:samples
-      x = X[:,i]
-      minx = minimum(x)
-      maxx = maximum(x)
-      ranx = maxx-minx
-      X[:,i] = (x-minx)/ranx
+      s = x[:,i]
+      mins = minimum(s)
+      maxs = maximum(s)
+      rans = maxs-mins
+      y[:,i] = (s-mins)/rans
     end
 
-    return X
+    return y
 end
 
 """
   # Boltzmann.normalize_samples! (utils.jl)
   ## Function Calls
-    `normalize_samples!(X::Mat{Float64})`
+    `normalize_samples!(x::Mat{Float64})`
   
   ## Description
-    Given a matrix, `X`, assume that each column represents a different
+    Given a matrix, `x`, assume that each column represents a different
     data sample and that each row represents a different feature. In this
     case, `normalize_samples` will normalize each individual sample to
     the range `[0,1]` according to the minimum and maximum features in the
     sample. 
 
   ## Returns
-    Nothing, modifies `X` in place.
+    Nothing, modifies `x` in place.
 
   ### See also...
     `normalize_samples`
 """
-function normalize_samples!(X::Mat{Float64})
-    samples = size(X,2)
+function normalize_samples!(x::Mat{Float64})
+    samples = size(x,2)
 
     for i=1:samples
-      x = X[:,i]
-      minx = minimum(x)
-      maxx = maximum(x)
-      ranx = maxx-minx
-      X[:,i] = (x-minx)/ranx
+      s = x[:,i]
+      mins = minimum(s)
+      maxs = maximum(s)
+      rans = maxs-mins
+      x[:,i] = (s-mins)/rans
     end
 end
 
@@ -105,26 +106,29 @@ end
     `normalize!`
 """
 function normalize(x::Mat{Float64})
+    y = zeros(x)
     minx = minimum(x)
     maxx = maximum(x)
     ranx = maxx-minx
 
+    # We can index a two-dimension array as if it were a vector.
     @simd for i=1:length(x)
-      @inbounds x[i] = (x[i]-minx) / ranx
+      @inbounds y[i] = (x[i]-minx) / ranx
     end
 
-    return x
+    return y
 end
 function normalize(x::Vec{Float64})
+    y = zeros(x)
     minx = minimum(x)
     maxx = maximum(x)
     ranx = maxx-minx
 
     @simd for i=1:length(x)
-      @inbounds x[i] = (x[i]-minx) / ranx
+      @inbounds y[i] = (x[i]-minx) / ranx
     end
 
-    return x
+    return y
 end
 
 """
@@ -276,9 +280,16 @@ end
     `logsig`
 """
 function logsig!(x::Mat{Float64})
-    @devec x = 1 ./ (1 + exp(-x))
+  # We would like to have used `@devec`, here, but this macro by default
+  # makes a new instantiation in memory and thus the result is distinct 
+  # from the original.
+  @simd for i=1:length(x)
+    @inbounds x[i] = 1 ./ (1 + exp(-x[i]))
+  end
 end
 function logsig!(x::Vec{Float64})
-    @devec x = 1 ./ (1 + exp(-x))
+  @simd for i=1:length(x)
+    @inbounds x[i] = 1 ./ (1 + exp(-x[i]))
+  end
 end
 
