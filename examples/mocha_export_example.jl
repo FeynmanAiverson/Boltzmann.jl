@@ -10,9 +10,9 @@ X = rand(100, 2000)
 y = rand(2000)
 
 # construct and train DBN
-dbn_layers = [("vis", GRBM(100, 50)),
-              ("hid1", BernoulliRBM(50, 25)),
-              ("hid2", BernoulliRBM(25, 20))]
+dbn_layers = [("vis", GRBM(100, 50,(10,10))),
+              ("hid1", BernoulliRBM(50, 25,(50,1))),
+              ("hid2", BernoulliRBM(25, 20,(25,1)))]
 dbn = DBN(dbn_layers)
 fit(dbn, X)
 
