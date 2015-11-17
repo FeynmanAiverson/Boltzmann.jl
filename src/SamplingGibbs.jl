@@ -27,7 +27,7 @@ end
 
 function sample_visibles{V,H}(rbm::RBM{V,H}, hid::Mat{Float64})
     means = ProbVisCondOnHid(rbm, hid)
-    return sample(V, means)
+    return sample(V, means), means
 end
 
 
@@ -47,4 +47,29 @@ function gibbs(rbm::RBM, vis::Mat{Float64}; n_times=1)
         end
     end
     return v_pos, h_pos, v_neg, h_neg
+end
+
+function MCMC(rbm::RBM, init::Mat{Float64}; iterations=1, StartMode="visible")    
+    if StartMode == "visible"
+    # In this first mode we assume that we are starting from the visible samples. E.g. in
+    # the case of binary RBM, we should be starting with binary samples.
+        vis_samples = copy(init)                                    # Start from the visible samples
+        vis_means   = copy(init)                                    # Giving a starting point for the means
+        hid_samples, hid_means = sample_hiddens(rbm,vis_samples)     # Get the first hidden means [NMF-ish]
+    end
+
+    if StartMode == "hidden"
+    # In this second mode we assume that we are starting from a set of hidden
+    # samples. Because of this, we increment the iteration count by 1
+        hid_samples = copy(init)
+        hid_means = copy(init)
+        iterations+=1
+    end
+    
+    for i=1:iterations-1
+        vis_samples, vis_means = sample_visibles(rbm,hid_samples)          # Sample the visible units from true distribution
+        hid_samples, hid_means = sample_hiddens(rbm,vis_samples)           # Update the hidden unit means, a NMF-ish approach
+    end
+
+    return vis_samples, hid_samples, vis_means, hid_means
 end

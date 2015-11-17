@@ -41,16 +41,26 @@ type RBM{V,H} <: AbstractRBM
     VisShape::Tuple{Int,Int}
 end
 
+function RBM(V::Type, H::Type, n_vis::Int, n_hid::Int, visshape::Tuple{Int,Int}; sigma=0.01, momentum=0.0, TrainData=[])
+    # Some "tiny" value, used to enforce min/max boundary conditions
+    eps = 1e-8
 
-function RBM(V::Type, H::Type, n_vis::Int, n_hid::Int, visshape::Tuple{Int,Int}; sigma=0.1, momentum=0.0, dataset=[])
+    # Initialize the weighting matrix by drawing from an iid Gaussian 
+    # of the specified standard deviation.
     W = rand(Normal(0, sigma), (n_hid, n_vis))
 
+    # If the user specifies the training dataset, it can be useful to
+    # initialize the visibile biases according to the empirical expected
+    # feature values of the training data.
+    #
+    # TODO: Generalize this biasing. Currently, the biasing is only written for 
+    #       the case of binary RBMs.
     InitialVisBias = zeros(n_vis,1)
-    if !isempty(dataset)
-        ProbVis = mean(dataset,2)   # Mean across samples
-        ProbVis = max(ProbVis,1e-8)
-        ProbVis = min(ProbVis,1 - 1e-8)
-        @devec InitialVisBias = log(ProbVis ./ (1-ProbVis))
+    if !isempty(TrainData)
+        ProbVis = mean(TrainData,2)             # Mean across  samples
+        ProbVis = max(ProbVis,eps)              # Some regularization (avoid Inf/NaN)
+        ProbVis = min(ProbVis,1 - eps)          # ''
+        @devec InitialVisBias = log(ProbVis ./ (1-ProbVis)) # Biasing as the log-proportion
     end
 
     RBM{V,H}(W,                                             # W
@@ -75,12 +85,12 @@ end
 
 
 typealias BernoulliRBM RBM{Bernoulli, Bernoulli}
-BernoulliRBM(n_vis::Int, n_hid::Int, visshape::Tuple{Int,Int}; sigma=0.1, momentum=0.0, dataset=[]) =
-    RBM(Bernoulli, Bernoulli, n_vis, n_hid, visshape; sigma=sigma, momentum=momentum, dataset=dataset)
+BernoulliRBM(n_vis::Int, n_hid::Int, visshape::Tuple{Int,Int}; sigma=0.1, momentum=0.0, TrainData=[]) =
+    RBM(Bernoulli, Bernoulli, n_vis, n_hid, visshape; sigma=sigma, momentum=momentum, TrainData=TrainData)
 
 typealias GRBM RBM{Gaussian, Bernoulli}
-GRBM(n_vis::Int, n_hid::Int, visshape::Tuple{Int,Int}; sigma=0.1, momentum=0.0, dataset=[]) =
-    RBM(Gaussian, Bernoulli, n_vis, n_hid, visshape; sigma=sigma, momentum=momentum, dataset=dataset)
+GRBM(n_vis::Int, n_hid::Int, visshape::Tuple{Int,Int}; sigma=0.1, momentum=0.0, TrainData=[]) =
+    RBM(Gaussian, Bernoulli, n_vis, n_hid, visshape; sigma=sigma, momentum=momentum, TrainData=TrainData)
 
 
 """
