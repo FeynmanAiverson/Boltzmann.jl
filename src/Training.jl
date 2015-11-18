@@ -73,7 +73,7 @@ end
 
 
 function fit_batch!(rbm::RBM, vis::Mat{Float64};
-                    persistent=true, lr=0.1, n_gibbs=1,
+                    persistent=true, lr=0.1, NormalizationApproxIter=1,
                     weight_decay="none",decay_magnitude=0.01, approx="CD")
     
     # Determine how to acquire the positive samples based upon the persistence mode.
@@ -101,7 +101,7 @@ function fit_batch!(rbm::RBM, vis::Mat{Float64};
     end        
 
     # Calculate the negative samples according to the desired approximation mode
-    v_neg, h_neg = get_negative_samples(rbm,v_init,h_init,approx,n_gibbs)
+    v_neg, h_neg = get_negative_samples(rbm,v_init,h_init,approx,NormalizationApproxIter)
 
     # If we are in persistent mode, update the chain accordingly
     if persistent
@@ -130,7 +130,7 @@ end
 """
     # Boltzmann.fit (training.jl)
     ## Function Call
-        `fit(rbm::RBM, X::Mat{Float64}[, persistent, lr, batch_size, n_gibbs, weight_decay, 
+        `fit(rbm::RBM, X::Mat{Float64}[, persistent, lr, batch_size, NormalizationApproxIter, weight_decay, 
                                          decay_magnitude, validation,monitor_ever, monitor_vis,
                                          approx, persistent_start])`
     ## Description
@@ -149,7 +149,7 @@ end
      - *lr:* Learning rate [default=0.1]
      - *n_iter:* Number of training epochs [default=10]
      - *batch_size:* Minibatch size [default=100]
-     - *n_gibbs:* Number of Gibbs sampling steps on the Markov Chain [default=1]
+     - *NormalizationApproxIter:* Number of Gibbs sampling steps on the Markov Chain [default=1]
      - *weight_decay:* A string value representing the regularization to add to apply to the 
                        weight magnitude during training {"none","l1","l2"}. [default="none"]
      - *decay_magnitude:* Relative importance assigned to the weight regularization. Smaller
@@ -168,7 +168,7 @@ end
                       epochs.
 """
 function fit(rbm::RBM, X::Mat{Float64};
-             persistent=true, lr=0.1, n_iter=10, batch_size=100, n_gibbs=1,
+             persistent=true, lr=0.1, n_iter=10, batch_size=100, NormalizationApproxIter=1,
              weight_decay="none",decay_magnitude=0.01,validation=[],
              monitor_every=5,monitor_vis=false, approx="CD",
              persistent_start=1)
@@ -199,19 +199,19 @@ function fit(rbm::RBM, X::Mat{Float64};
     info("=====================================")
     info("RBM Training")
     info("=====================================")
-    info("  + Training Samples:   $n_samples")
-    info("  + Features:           $n_features")
-    info("  + Hidden Units:       $n_hidden")
-    info("  + Epochs to run:      $n_iter")
-    info("  + Persistent ?:       $persistent")
-    info("  + Training approx:    $approx")
-    info("  + Momentum:           $m_")
-    info("  + Learning rate:      $lr")
-    info("  + Gibbs Steps:        $n_gibbs")   
-    info("  + Weight Decay?:      $weight_decay") 
-    info("  + Weight Decay Mag.:  $decay_magnitude")
-    info("  + Validation Set?:    $flag_use_validation")    
-    info("  + Validation Samples: $n_valid")   
+    info("  + Training Samples:     $n_samples")
+    info("  + Features:             $n_features")
+    info("  + Hidden Units:         $n_hidden")
+    info("  + Epochs to run:        $n_iter")
+    info("  + Persistent ?:         $persistent")
+    info("  + Training approx:      $approx")
+    info("  + Momentum:             $m_")
+    info("  + Learning rate:        $lr")
+    info("  + Norm. Approx. Iters:  $NormalizationApproxIter")   
+    info("  + Weight Decay?:        $weight_decay") 
+    info("  + Weight Decay Mag.:    $decay_magnitude")
+    info("  + Validation Set?:      $flag_use_validation")    
+    info("  + Validation Samples:   $n_valid")   
     info("=====================================")
 
     # Scale the learning rate by the batch size
@@ -234,7 +234,7 @@ function fit(rbm::RBM, X::Mat{Float64};
             batch = full(batch)
           
             fit_batch!(rbm, batch; persistent=use_persistent, 
-                                   n_gibbs=n_gibbs,
+                                   NormalizationApproxIter=NormalizationApproxIter,
                                    weight_decay=weight_decay,
                                    decay_magnitude=decay_magnitude,
                                    lr=lr, approx=approx)
