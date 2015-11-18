@@ -30,6 +30,21 @@ function chart_weights(W, imsize; padding=0, annotation="", filename="", noshow=
     return dat
 end
 
+function plot_hidden_activations(rbm::RBM,X::Mat{Float64})
+    max_samples = 100
+    n_samples = min(size(X,2),max_samples)
+    x,_ = random_columns(X,n_samples)
+
+    # Get all hidden activations for batch    
+    act = ProbHidCondOnVis(rbm,x)
+    # Show this matrix of activations
+    plt.imshow(act;interpolation="Nearest")
+    plt.title("Hidden Unit Activations")
+    plt.xlabel("Random Samples")
+    plt.ylabel("Hidden Unit Index")
+    plt.gray()
+
+end
 
 function plot_scores(mon::Monitor)
     ax_pl = plt.gca()
@@ -55,17 +70,17 @@ function plot_scores(mon::Monitor)
     plt.xlabel("Training Epoch")
     plt.xlim((1,mon.Epochs[mon.LastIndex]))        
     plt.grid("on")        
-    # if mon.UseValidation
-    #     plt.legend(handles=[hpl;hvpl;hre;hvre],loc=4)
-    # else
-    #     plt.legend(handles=[hpl;hre],loc=4)
-    # end
+    if mon.UseValidation
+        plt.legend(handles=[hpl;hvpl;htl;hvtl;hre;hvre],loc=2)
+    else
+        plt.legend(handles=[hpl;htl;hre],loc=2)
+    end
 end
 
 function plot_evolution(mon::Monitor)
     hbt = plt.plot(mon.Epochs,mon.BatchTime_µs,"-k*",label="Norm. Batch time (µs)")
 
-    # plt.legend(handles=hbt,loc=1)
+    plt.legend(handles=hbt,loc=1)
     plt.title("Evolution")
     plt.xlabel("Training Epoch")
     plt.xlim((1,mon.Epochs[mon.LastIndex]))        
@@ -115,8 +130,8 @@ function figure_refresh(figureHandle)
 end
 
 
-function SaveMonitor(rbm::RBM,mon::Monitor,filename::AbstractString)
-    savefig = plt.figure(5;figsize=(11,15))
+function WriteMonitorChartPDF(rbm::RBM,mon::Monitor,X::Mat{Float64},filename::AbstractString)
+    savefig = plt.figure(5;figsize=(12,15))
     # Show Per-Epoch Progres
     savefig[:add_subplot](321)
         plot_scores(mon)
@@ -134,7 +149,8 @@ function SaveMonitor(rbm::RBM,mon::Monitor,filename::AbstractString)
 
     # Show the current visible biasing
     savefig[:add_subplot](325)
-        plot_vbias(rbm)
+        # plot_vbias(rbm)
+        plot_hidden_activations(rbm,X)
 
     # Show the distribution of weight values
     savefig[:add_subplot](326)
@@ -147,7 +163,7 @@ end
 
 
 
-function ShowMonitor(rbm::RBM,mon::Monitor,itr::Int;filename=[])
+function ShowMonitor(rbm::RBM,mon::Monitor,X::Mat{Float64},itr::Int;filename=[])
     fig = mon.FigureHandle
 
     if mon.MonitorVisual && itr%mon.MonitorEvery==0
@@ -171,7 +187,8 @@ function ShowMonitor(rbm::RBM,mon::Monitor,itr::Int;filename=[])
 
         # Show the current visible biasing
         fig[:add_subplot](325)
-            plot_vbias(rbm)
+            # plot_vbias(rbm)
+            plot_hidden_activations(rbm,X)
 
         # Show the distribution of weight values
         fig[:add_subplot](326)
