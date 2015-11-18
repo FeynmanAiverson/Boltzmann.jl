@@ -293,3 +293,24 @@ function logsig!(x::Vec{Float64})
   end
 end
 
+"""
+  # Boltzmann.random_samplse (utils.jl)
+  ## Function Calls
+    `random_columns(x::Mat{Float64})`
+  ## Description
+    Select a random permutation of the columsn of the specified 
+    matrix, returning the permuted sub-matrix as well as the 
+    column indices selected from the original matrix.
+
+  ## Returns
+    1. `::Mat{Float64}`, the random sub-matrix.
+    2. `::Vec{Int}`, the array of selected column indices
+"""
+function random_columns(x::Mat{Float64},n_select::Int)
+    n_features = size(x,1)
+    n_columns = size(x,2)
+    perm = shuffle!(collect(1:n_columns))[1:n_select]
+    y = x[:,perm]
+
+    return y, perm
+end
