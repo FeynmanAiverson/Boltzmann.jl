@@ -11,16 +11,16 @@ function run_mnist()
     TrainSet = X
     ValidSet = []
     HiddenUnits = 500;
-    Epochs = 20;
-    Gibbs = 1;
-    IterMag = 3
+    Epochs = 10;
+    MCMCIter = 1;
+    EMFIter = 3
     LearnRate = 0.005
     MonitorEvery=2
-    PersistStart=5
+    EMFPersistStart=5
 
-    rbm1 = BernoulliRBM(28*28, HiddenUnits, (28,28); momentum=0.0, TrainData=TrainSet)
-    rbm2 = BernoulliRBM(28*28, HiddenUnits, (28,28); momentum=0.0, TrainData=TrainSet)
-    rbm3 = BernoulliRBM(28*28, HiddenUnits, (28,28); momentum=0.0, TrainData=TrainSet)
+    rbm1 = BernoulliRBM(28*28, HiddenUnits, (28,28); momentum=0.5, TrainData=TrainSet, sigma = 0.01)
+    rbm2 = BernoulliRBM(28*28, HiddenUnits, (28,28); momentum=0.5, TrainData=TrainSet, sigma = 0.01)
+    rbm3 = BernoulliRBM(28*28, HiddenUnits, (28,28); momentum=0.5, TrainData=TrainSet, sigma = 0.01)
 
 
     finalrbmtap2,monitor = fit(rbm1, TrainSet;n_iter=Epochs,
@@ -29,44 +29,43 @@ function run_mnist()
                           lr=LearnRate,
                           persistent=true,
                           validation=ValidSet,
-                          n_gibbs=IterMag,
+                          NormalizationApproxIter=EMFIter,
                           monitor_every=MonitorEvery,
                           monitor_vis=true,
                           approx="tap2",
-                          persistent_start=PersistStart)
+                          persistent_start=EMFPersistStart)
 
-    SaveMonitor(finalrbmtap2,monitor,"testmonitor_tap2.pdf")
-    SaveMonitorh5(monitor,"testmonitor_tap2.h5")
+    WriteMonitorChartPDF(finalrbmtap2,monitor,X,"testmonitor_tap2.pdf")
+    SaveMonitorHDF5(monitor,"testmonitor_tap2.h5")
 
-    # finalrbmnaive,monitor = fit(rbm2, TrainSet;n_iter=Epochs,
-    #                       weight_decay="l2",
-    #                       decay_magnitude=0.001,
-    #                       lr=LearnRate,
-    #                       persistent=true,
-    #                       validation=ValidSet,
-    #                       n_gibbs=IterMag,
-    #                       monitor_every=MonitorEvery,
-    #                       monitor_vis=true,
-    #                       approx="naive",
-    #                       persistent_start=PersistStart)
+    finalrbmnaive,monitor = fit(rbm2, TrainSet;n_iter=Epochs,
+                          weight_decay="l2",
+                          decay_magnitude=0.001,
+                          lr=LearnRate,
+                          persistent=true,
+                          validation=ValidSet,
+                          NormalizationApproxIter=EMFIter,
+                          monitor_every=MonitorEvery,
+                          monitor_vis=true,
+                          approx="naive",
+                          persistent_start=EMFPersistStart)
 
-    # SaveMonitor(finalrbmnaive,monitor,"testmonitor_naive.pdf")
-    # SaveMonitorh5(monitor,"testmonitor_naive.h5")
+    WriteMonitorChartPDF(finalrbmnaive,monitor,X,"testmonitor_naive.pdf")
+    SaveMonitorHDF5(monitor,"testmonitor_naive.h5")
 
-    # finalrbmCD,monitor = fit(rbm3, TrainSet;n_iter=Epochs,
-    #                       weight_decay="l2",
-    #                       decay_magnitude=0.001,
-    #                       lr=LearnRate,
-    #                       persistent=true,                          
-    #                       validation=ValidSet,
-    #                       n_gibbs=Gibbs,
-    #                       monitor_every=MonitorEvery,
-    #                       monitor_vis=true,
-    #                       approx="CD",
-    #                       persistent_start=1)
+    finalrbmCD,monitor = fit(rbm3, TrainSet;n_iter=Epochs,
+                          weight_decay="l2",
+                          decay_magnitude=0.001,
+                          lr=LearnRate,
+                          persistent=true,                          
+                          validation=ValidSet,
+                          NormalizationApproxIter=MCMCIter,
+                          monitor_every=MonitorEvery,
+                          monitor_vis=true,
+                          approx="CD")
 
-    # SaveMonitor(finalrbmCD,monitor,"testmonitor_CD.pdf")
-    # SaveMonitorh5(monitor,"testmonitor_CD.h5")
+    WriteMonitorChartPDF(finalrbmCD,monitor,X,"testmonitor_CD.pdf")
+    SaveMonitorHDF5(monitor,"testmonitor_CD.h5")
 end
 
 run_mnist()
