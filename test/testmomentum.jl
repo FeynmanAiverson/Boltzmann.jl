@@ -7,7 +7,7 @@ using Base.Test
 
 function run_mnist()
     X, y = testdata()  # test data is smaller, no need to downsample
-    binarize!(X)
+    binarize!(X;threhold=0.01)
 
     HiddenUnits = 256;
     Epochs = 10;

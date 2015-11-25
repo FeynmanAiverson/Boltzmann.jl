@@ -2,8 +2,13 @@
 \#*
 .\#*
 *.hdf5
+*.h5 
+.hdf5
+.h5
 
 ## Ignore charts in repo
 *.pdf
 *.png
 *.jpg
+
+*.h5

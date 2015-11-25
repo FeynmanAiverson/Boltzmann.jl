@@ -1,6 +1,6 @@
 The Boltzmann.jl package is licensed under the MIT "Expat" License:
 
-> Copyright (c) 2014: Andrei Zhabinski.
+> Copyright (c) 2015: SPHINX Team (LPS UMR 8550, ENS)
 >
 > Permission is hereby granted, free of charge, to any person obtaining
 > a copy of this software and associated documentation files (the

@@ -26,14 +26,15 @@ export RBM,
        normalize_samples,
        normalize_samples!,
        ShowMonitor,
-       SaveMonitor,
+       WriteMonitorChartPDF,
+       SaveMonitorHDF5,
        plot_scores,
        plot_evolution,
        plot_rf,
        plot_chain,
        plot_vbias,
-       plot_weightdist
-
+       plot_weightdist,
+       chart_likelihood_evolution
 
 include("core.jl")
 

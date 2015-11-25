@@ -1,7 +1,3 @@
-using Images
-# using Colors
-# using ImageView
-# using Gadfly
 using PyCall
 @pyimport matplotlib.pyplot as plt
 
@@ -31,22 +27,34 @@ function chart_weights(W, imsize; padding=0, annotation="", filename="", noshow=
 
     normalize!(dat)
 
-    # Write to file
-    if length(filename) > 0
-        Images.imwrite(dat,filename,quality=100)
-    end
-
     return dat
 end
 
+function plot_hidden_activations(rbm::RBM,X::Mat{Float64})
+    max_samples = 100
+    n_samples = min(size(X,2),max_samples)
+    x,_ = random_columns(X,n_samples)
+
+    # Get all hidden activations for batch    
+    act = ProbHidCondOnVis(rbm,x)
+    # Show this matrix of activations
+    plt.imshow(act;interpolation="Nearest")
+    plt.title("Hidden Unit Activations")
+    plt.xlabel("Random Samples")
+    plt.ylabel("Hidden Unit Index")
+    plt.gray()
+
+end
 
 function plot_scores(mon::Monitor)
     ax_pl = plt.gca()
     ax_re = ax_pl[:twinx]()
     
     hpl = ax_pl[:plot](mon.Epochs,mon.PseudoLikelihood,"b^-",label="Pseudo-Likelihood")
+    htl = ax_pl[:plot](mon.Epochs,mon.TAPLikelihood,"g^-",label="Tap-Likelihood")
     if mon.UseValidation
         hvpl = ax_pl[:plot](mon.Epochs,mon.ValidationPseudoLikelihood,"b^:",label="Pseudo-Likelihood (Validation)")
+        hvtl = ax_pl[:plot](mon.Epochs,mon.ValidationTAPLikelihood,"g^:",label="Tap-Likelihood (Validation)")
     end
     ax_pl[:set_ylabel]("Normalized Likelihood")
     ax_pl[:set_ylim]((-0.3,0.0))
@@ -63,9 +71,9 @@ function plot_scores(mon::Monitor)
     plt.xlim((1,mon.Epochs[mon.LastIndex]))        
     plt.grid("on")        
     if mon.UseValidation
-        plt.legend(handles=[hpl;hvpl;hre;hvre],loc=4)
+        plt.legend(handles=[hpl;hvpl;htl;hvtl;hre;hvre],loc=2)
     else
-        plt.legend(handles=[hpl;hre],loc=4)
+        plt.legend(handles=[hpl;htl;hre],loc=2)
     end
 end
 
@@ -89,7 +97,7 @@ end
 
 function plot_chain(rbm::RBM)
     # TODO: Implement Chain display in the case of 1D signals
-    pc = chart_weights(rbm.persistent_chain',rbm.VisShape; padding=0,noshow=true,ordering=false)    
+    pc = chart_weights(rbm.persistent_chain_vis',rbm.VisShape; padding=0,noshow=true,ordering=false)    
     plt.imshow(pc;interpolation="Nearest")
     plt.title("Visible Chain")
     plt.gray()
@@ -122,8 +130,8 @@ function figure_refresh(figureHandle)
 end
 
 
-function SaveMonitor(rbm::RBM,mon::Monitor,filename::AbstractString)
-    savefig = plt.figure(5;figsize=(11,15))
+function WriteMonitorChartPDF(rbm::RBM,mon::Monitor,X::Mat{Float64},filename::AbstractString)
+    savefig = plt.figure(5;figsize=(12,15))
     # Show Per-Epoch Progres
     savefig[:add_subplot](321)
         plot_scores(mon)
@@ -141,7 +149,8 @@ function SaveMonitor(rbm::RBM,mon::Monitor,filename::AbstractString)
 
     # Show the current visible biasing
     savefig[:add_subplot](325)
-        plot_vbias(rbm)
+        # plot_vbias(rbm)
+        plot_hidden_activations(rbm,X)
 
     # Show the distribution of weight values
     savefig[:add_subplot](326)
@@ -152,7 +161,9 @@ function SaveMonitor(rbm::RBM,mon::Monitor,filename::AbstractString)
 end
 
 
-function ShowMonitor(rbm::RBM,mon::Monitor,itr::Int;filename=[])
+
+
+function ShowMonitor(rbm::RBM,mon::Monitor,X::Mat{Float64},itr::Int;filename=[])
     fig = mon.FigureHandle
 
     if mon.MonitorVisual && itr%mon.MonitorEvery==0
@@ -176,7 +187,8 @@ function ShowMonitor(rbm::RBM,mon::Monitor,itr::Int;filename=[])
 
         # Show the current visible biasing
         fig[:add_subplot](325)
-            plot_vbias(rbm)
+            # plot_vbias(rbm)
+            plot_hidden_activations(rbm,X)
 
         # Show the distribution of weight values
         fig[:add_subplot](326)
@@ -189,14 +201,37 @@ function ShowMonitor(rbm::RBM,mon::Monitor,itr::Int;filename=[])
         li = mon.LastIndex
         ce = mon.Epochs[li]
         if mon.UseValidation
-            @printf("[Epoch %04d] Train(pl : %0.3f), Valid(pl : %0.3f)  [%0.3f µsec/batch/unit]\n",ce,
+            @printf("[Epoch %04d] Train(pl : %0.3f, tl : %0.3f), Valid(pl : %0.3f, tl : %0.3f)  [%0.3f µsec/batch/unit]\n",ce,
                                                                                                    mon.PseudoLikelihood[li],
+                                                                                                   mon.TAPLikelihood[li],
                                                                                                    mon.ValidationPseudoLikelihood[li],
+                                                                                                   mon.ValidationTAPLikelihood[li],
                                                                                                    mon.BatchTime_µs[li])
         else
-            @printf("[Epoch %04d] Train(pl : %0.3f)  [%0.3f µsec/batch]\n",ce,
+            @printf("[Epoch %04d] Train(pl : %0.3f, tl : %0.3f)  [%0.3f µsec/batch]\n",ce,
                                                                            mon.PseudoLikelihood[li],
+                                                                           mon.TAPLikelihood[li],
                                                                            mon.BatchTime_µs[li])
         end
     end
 end
+
+# function chart_likelihood_evolution(pseudo, tap; filename="")
+
+#     if length(filename) > 0
+#         # Write to file if filename specified
+#         LikelihoodPlot = plot(  
+#                                 layer(x=1:length(pseudo),y=pseudo,Geom.point, Geom.line),
+#                                 layer(x=1:length(tap),y=tap, Geom.point, Geom.line, Theme(default_color=colorant"green")),
+#                                 Guide.xlabel("epochs"),Guide.ylabel("Likelihood"),Guide.title("Evolution of likelihood for training set")
+#                             )
+#         draw(PDF(filename, 10inch, 6inch), LikelihoodPlot)
+#     else
+#         # Draw plot if no filename given
+#        plot(  
+#                                 layer(x=1:length(pseudo),y=pseudo,Geom.point, Geom.line),
+#                                 layer(x=1:length(tap),y=tap, Geom.point, Geom.line, Theme(default_color=colorant"green")),
+#                                 Guide.xlabel("epochs"),Guide.ylabel("Likelihood"),Guide.title("Evolution of likelihood for training set")
+#                             )
+#     end
+# end

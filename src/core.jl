@@ -1,6 +1,10 @@
-
 include("utils.jl")
-include("rbm.jl")
+include("RBMBase.jl")
+include("SamplingGibbs.jl")
+include("SamplingEMF.jl")
+include("Scoring.jl")
+include("Monitor.jl")
+include("Training.jl")
 include("nets.jl")
-include("io.jl")
 include("charts.jl")
+include("io.jl")
