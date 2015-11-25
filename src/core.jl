@@ -1,5 +1,6 @@
 include("utils.jl")
 include("RBMBase.jl")
+include("DBMBase.jl")
 include("SamplingGibbs.jl")
 include("SamplingEMF.jl")
 include("Scoring.jl")

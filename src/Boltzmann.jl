@@ -8,6 +8,7 @@ export RBM,
        GRBM,
        DBN,
        DAE,
+       DBM,
        fit,
        transform,
        generate,
@@ -34,7 +35,8 @@ export RBM,
        plot_chain,
        plot_vbias,
        plot_weightdist,
-       chart_likelihood_evolution
+       chart_likelihood_evolution,
+       ProbHidAtLayerCondOnVis
 
 include("core.jl")
 
