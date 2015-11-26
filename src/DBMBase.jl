@@ -33,7 +33,7 @@ type DBM <: Net
 end
 
 DBM{T<:@compat(Tuple{AbstractString,RBM})}(namedlayers::Vector{T}) =
-    DBN(map(p -> p[2], namedlayers), map(p -> p[1], namedlayers))
+    DBM(map(p -> p[2], namedlayers), map(p -> p[1], namedlayers))
 
 
 """

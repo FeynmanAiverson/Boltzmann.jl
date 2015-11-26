@@ -19,21 +19,23 @@ function run_mnist()
     HiddenUnits2 = 100
     HiddenUnits3 = 10
 
-    rbm0 = BernoulliRBM(28*28, 			HiddenUnits1, (28,28); momentum=0.5, TrainData=TrainSet, sigma = 0.01)
-    rbm1 = BernoulliRBM(HiddenUnits1, 	HiddenUnits2, (HiddenUnits1,1); momentum=0.5, TrainData=TrainSet, sigma = 0.01)
-    rbm2 = BernoulliRBM(HiddenUnits2, 	HiddenUnits3, (HiddenUnits2,1); momentum=0.5, TrainData=TrainSet, sigma = 0.01)
+    rbm1 = BernoulliRBM(28*28, 			HiddenUnits1, (28,28); momentum=0.5, TrainData=TrainSet, sigma = 0.01)
+    rbm2 = BernoulliRBM(HiddenUnits1, 	HiddenUnits2, (HiddenUnits1,1); momentum=0.5, sigma = 0.01)
+    rbm3 = BernoulliRBM(HiddenUnits2, 	HiddenUnits3, (HiddenUnits2,1); momentum=0.5, sigma = 0.01)
 
-	layers = [("vis",  rbm0),
-	          ("hid1", rbm1),
-	          ("hid2", rbm2)]
+	layers = [("vis",  rbm1),
+	          ("hid1", rbm2),
+	          ("hid2", rbm3)]
 	dbm = DBM(layers)
 
+
 	println(dbm)
-	mhid2=ProbHidAtLayerCondOnVis(dbm,X,2)
-	println(size(mhid2)) 
-	mhid1=ProbHidCondOnNeighbors(dbm[1],X,dbm[2],mhid2)
-	println(size(mhid1))
-	println(mhid1)  
+	println(dbm[1])
+	# mhid2=ProbHidAtLayerCondOnVis(dbm,X,2)
+	# println(size(mhid2)) 
+	# mhid1=ProbHidCondOnNeighbors(dbm[1],X,dbm[2],mhid2)
+	# println(size(mhid1))
+	# println(mhid1)  
 
 end
 
