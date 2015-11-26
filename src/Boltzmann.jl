@@ -36,7 +36,8 @@ export RBM,
        plot_vbias,
        plot_weightdist,
        chart_likelihood_evolution,
-       ProbHidAtLayerCondOnVis
+       ProbHidAtLayerCondOnVis,
+       ProbHidCondOnNeighbors
 
 include("core.jl")
 

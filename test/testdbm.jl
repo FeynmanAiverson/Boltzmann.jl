@@ -29,7 +29,11 @@ function run_mnist()
 	dbm = DBM(layers)
 
 	println(dbm)
-	println(size(ProbHidAtLayerCondOnVis(dbm,X,3))) 
+	mhid2=ProbHidAtLayerCondOnVis(dbm,X,2)
+	println(size(mhid2)) 
+	mhid1=ProbHidCondOnNeighbors(dbm[1],X,dbm[2],mhid2)
+	println(size(mhid1))
+	println(mhid1)  
 
 end
 

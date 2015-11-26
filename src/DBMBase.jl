@@ -35,8 +35,29 @@ end
 DBM{T<:@compat(Tuple{AbstractString,RBM})}(namedlayers::Vector{T}) =
     DBN(map(p -> p[2], namedlayers), map(p -> p[1], namedlayers))
 
+
 """
-    # Boltzmann.ProbHidLayerCondOnVis (DBMBase.jl)
+    # Boltzmann.PassVisHid2ToHid1  (DBMBase.jl)
+"""
+function PassVisHid2ToHid1(rbm1::RBM, vis::Mat{Float64}, rbm2::RBM, hid2::Mat{Float64})
+    return rbm2.W' * hid2 .+ rbm1.W * vis .+ rbm1.hbias
+end
+
+### These functions need to be generalized to detect the Distribution on 
+### the hidden and visible variables.
+"""
+    # Boltzmann.ProbHidCondOnNeighbors  (RBMBase.jl)
+"""
+function ProbHidCondOnNeighbors(rbm1::RBM, vis::Mat{Float64}, rbm2::RBM, hid2::Mat{Float64})
+    return logsig(PassVisHid2ToHid1(rbm1,vis,rbm2,hid2))
+end
+
+
+"""
+    # Boltzmann.ProbHidAtLayerCondOnVis (DBMBase.jl)
+    ## Description 
+        Function performing approximate inference
+        TODO : add DBM specific augmented input 
 """
 
 function ProbHidAtLayerCondOnVis(net::Net, vis::Mat{Float64}, layer::Int)
