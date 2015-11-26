@@ -56,7 +56,7 @@ end
 """
     # Boltzmann.ProbHidAtLayerCondOnVis (DBMBase.jl)
     ## Description 
-        Function performing approximate inference
+        Function performing naive MF approximate inference
         TODO : add DBM specific augmented input 
 """
 
@@ -67,4 +67,21 @@ function ProbHidAtLayerCondOnVis(net::Net, vis::Mat{Float64}, layer::Int)
         hiddens[k] = ProbHidCondOnVis(net[k], hiddens[k-1])
     end
     hiddens[end]
+end
+
+"""
+    # Boltzmann.EMFProbHidInitCondOnVis (DBMBase.jl)
+    ## Description 
+        Function performing naive MF approximate inference
+        TODO : add DBM specific augmented input 
+"""
+
+function EMFProbHidInitCondOnVis(net::Net, vis::Mat{Float64}, approx::AbstractString)
+    depth = length(net)-1 
+    array_hid_init = Array(Array{Float64, 2}, depth)
+    array_hid_init[1] = ProbHidCondOnVis(net[1], vis)
+    for k=2:depth
+        array_hid_init[k] = ProbHidCondOnVis(net[k], array_hid_init[k-1])
+    end
+    array_hid_init
 end
