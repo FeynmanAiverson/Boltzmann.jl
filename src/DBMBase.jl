@@ -76,9 +76,9 @@ end
         TODO : add DBM specific augmented input 
 """
 
-function EMFProbHidInitCondOnVis(net::Net, vis::Mat{Float64}, approx::AbstractString)
+function ProbHidInitCondOnVis(net::Net, vis::Mat{Float64})
     depth = length(net)-1 
-    array_hid_init = Array(Array{Float64, 2}, depth)
+    array_hid_init = Array(Array{Float64}, depth)
     array_hid_init[1] = ProbHidCondOnVis(net[1], vis)
     for k=2:depth
         array_hid_init[k] = ProbHidCondOnVis(net[k], array_hid_init[k-1])

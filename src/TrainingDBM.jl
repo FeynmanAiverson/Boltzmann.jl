@@ -11,52 +11,6 @@ using PyCall
 
 import StatsBase.fit
 
-# function calculate_weight_gradient!(rbm::RBM, h_pos::Mat{Float64}, v_pos::Mat{Float64}, h_neg::Mat{Float64}, v_neg::Mat{Float64}, lr::Float64; approx="CD")
-#     ## Load step buffer with negative-phase    
-#     gemm!('N', 'T', lr, h_neg, v_neg, 0.0, rbm.dW)          # dW <- LearRate*<h_neg,v_neg>
-#     ## Stubtract step buffer from positive-phase to get gradient    
-#     gemm!('N', 'T', lr, h_pos, v_pos, -1.0, rbm.dW)         # dW <- LearnRate*<h_pos,v_pos> - dW
-#     ## Second-Order EMF Correction (for EMF-TAP2, EMF-TAP3)
-#     if contains(approx,"tap") 
-#         buf2 = gemm('N', 'T', h_neg-abs2(h_neg), v_neg-abs2(v_neg)) .* rbm.W  
-#         axpy!(-lr, buf2, rbm.dW)
-#     end
-#     ## Third-Order EMF Correction (for EMF-TAP3)
-#     if approx == "tap3"
-#         buf3 = gemm('N','T', (h_neg-abs2(h_neg)) .* (0.5-h_neg), (v_neg-abs2(v_neg)) .* (0.5-v_neg)) .* rbm.W2
-#         axpy!(-2.0*lr, buf3, rbm.dW)  
-#     end    
-#     ## Apply Momentum (adding last gradient to this one)    
-#     axpy!(rbm.momentum, rbm.dW_prev, rbm.dW)    # rbm.dW += rbm.momentum * rbm.dW_prev
-# end
-
-# function update_weights!(rbm::RBM,approx::AbstractString)
-#     axpy!(1.0,rbm.dW,rbm.W)             # Take step: W = W + dW
-#     copy!(rbm.dW_prev, rbm.dW)          # Save the current step for future use
-#     if contains(approx,"tap")
-#         rbm.W2 = rbm.W  .* rbm. W       # Update Square [for EMF-TAP2]
-#     end
-#     if approx == "tap3"
-#         rbm.W3 = rbm.W2 .* rbm.W        # Update Cube   [for EMF-TAP3]
-#     end
-#  end
-
-# function regularize_weight_gradient!(rbm::RBM,LearnRate::Float64;L2Penalty::Float64=NaN,L1Penalty::Float64=NaN,DropOutRate::Float64=NaN)
-#     ## Quadratic penalty on weights (Energy shrinkage)
-#     if !isnan(L2Penalty)
-#         axpy!(-LearnRate*L2Penalty,rbm.W,rbm.dW)
-#     end
-#     ## Linear penalty on weights (Sparsifying)
-#     if !isnan(L1Penalty)
-#         axpy!(-LearnRate*L1Penalty,sign(rbm.W),rbm.dW)
-#     end
-#     ## Dropout Regularization (restricted set of updates)
-#     if !isnan(DropOutRate)
-#         # Not yet implemented, so we do nothing.
-#         # TODO: Implement Drop-out, here.
-#     end
-# end
-
 function get_negative_samples(dbm::DBM, vis_init::Mat{Float64}, array_hid_init::Array{Array{Float64},1},approx::AbstractString, iterations::Int)
     if approx=="naive" || contains(approx,"tap")
         v_neg, array_h_neg = equilibrate(dbm,vis_init,array_hid_init; iterations=iterations, approx=approx)
@@ -76,7 +30,7 @@ function get_positive_samples(dbm::DBM, vis::Mat{Float64}, array_hid_init::Array
         v_pos, array_h_pos = clamped_equilibrate(dbm,vis,array_hid_init; iterations=iterations, approx=approx)
     end
 
-    if approx=="CD" 
+    if approx=="CD" ##TODO
         # In the case of Gibbs/MCMC sampling, we will take the binary visible samples as the negative
         # visible samples, and the expectation (means) for the negative hidden samples.
         # v_neg, _, _, h_neg = MCMC(rbm, hid_init; iterations=iterations, StartMode="hidden") ## TODO : implement MCMC for DBM
@@ -85,59 +39,83 @@ function get_positive_samples(dbm::DBM, vis::Mat{Float64}, array_hid_init::Array
     return v_pos, array_h_pos
 end
 
-# function fit_batch!(rbm::RBM, vis::Mat{Float64};
-#                     persistent=true, lr=0.1, NormalizationApproxIter=1,
-#                     weight_decay="none",decay_magnitude=0.01, approx="CD")
-    
-#     # Determine how to acquire the positive samples based upon the persistence mode.
-#     v_pos = vis
-#     h_samples, h_pos = sample_hiddens(rbm,v_pos)
-#     # Set starting points in teh case of persistence
-#     if persistent
-#         if approx=="naive" || contains(approx,"tap")
-#             v_init = copy(rbm.persistent_chain_vis)      
-#             h_init = copy(rbm.persistent_chain_hid)       
-#         end
-#         if approx=="CD" 
-#             v_init = vis               # A dummy setting
-#             h_init,_ = sample_hiddens(rbm,rbm.persistent_chain_vis)
-#         end
-#     else
-#         if approx=="naive" || contains(approx,"tap")
-#             v_init = vis
-#             h_init = h_pos
-#         end
-#         if approx=="CD"
-#             v_init = vis               # A dummy setting
-#             h_init = h_samples
-#         end
-#     end        
+function fit_batch!(dbm::DBM, vis::Mat{Float64};
+                    persistent=true, lr=0.1, NormalizationApproxIter=1,
+                    weight_decay="none",decay_magnitude=0.01, approx="CD")
+    depth = length(dbm)-1
 
-#     # Calculate the negative samples according to the desired approximation mode
-#     v_neg, h_neg = get_negative_samples(rbm,v_init,h_init,approx,NormalizationApproxIter)
+    if approx=="naive" || contains(approx,"tap")
+        array_h_pos_init = ProbHidInitCondOnVis(dbm, vis)
+        v_pos, array_h_pos = get_positive_samples(dbm, vis, array_h_pos_init, approx,NormalizationApproxIter)
+        
+        if persistent # Set starting points in the case of persistence
+            v_init = copy(dbm[1].persistent_chain_vis)  
+            array_hid_init = Array(Array{Float64}, depth) 
+            for l=1:depth  
+                array_hid_init[l] = copy(dbm[l].persistent_chain_hid)
+            end
+        else
+            v_init = vis
+            array_hid_init = array_h_pos
+    end  
+    ## TODO : fix the contrastive divergence procedure      
+    # elseif approx=="CD" 
+    #     if persistent # Set starting points in the case of persistence
+    #         v_pos = vis
+    #         h_samples, h_pos = sample_hiddens(rbm,v_pos)
+    #         v_init = vis               # A dummy setting
+    #         h_init,_ = sample_hiddens(rbm,rbm.persistent_chain_vis)
+    #     else
+    #         v_init = vis               # A dummy setting
+    #         h_init = h_samples
+    #     end
+    end        
 
-#     # If we are in persistent mode, update the chain accordingly
-#     if persistent
-#         copy!(rbm.persistent_chain_vis,v_neg)
-#         copy!(rbm.persistent_chain_hid,h_neg)
-#     end
+    # Calculate the negative samples according to the desired approximation mode
+    v_neg, array_h_neg = get_negative_samples(dbm,v_init,array_hid_init,approx,NormalizationApproxIter)
 
-#     # Update on weights
-#     calculate_weight_gradient!(rbm,h_pos,v_pos,h_neg,v_neg,lr,approx=approx)
-#     if weight_decay == "l2"
-#         regularize_weight_gradient!(rbm,lr;L2Penalty=decay_magnitude)
-#     end
-#     if weight_decay == "l1"
-#         regularize_weight_gradient!(rbm,lr;L1Penalty=decay_magnitude)
-#     end
-#     update_weights!(rbm,approx)
+    # If we are in persistent mode, update the chain accordingly
+    if persistent
+        copy!(dbm[1].persistent_chain_vis,v_neg)
+        for l=1:depth  
+            copy!(dbm[l].persistent_chain_hid,array_h_neg[l])
+        end
+    end
 
-#     # Gradient update on biases
-#     rbm.hbias += vec(lr * (sum(h_pos, 2) - sum(h_neg, 2)))
-#     rbm.vbias += vec(lr * (sum(v_pos, 2) - sum(v_neg, 2)))
+    # Update on weights abd biases
+    # Start with the first RBM
+    rbm=dbm[1]
+    h_pos=array_h_pos[1]
+    h_neg=array_h_neg[1]
+    calculate_weight_gradient!(rbm,h_pos,v_pos,h_neg,v_neg,lr,approx=approx)
+    if weight_decay == "l2"
+        regularize_weight_gradient!(rbm,lr;L2Penalty=decay_magnitude)
+    end
+    if weight_decay == "l1"
+        regularize_weight_gradient!(rbm,lr;L1Penalty=decay_magnitude)
+    end
+    update_weights!(rbm,approx)
+    rbm.hbias += vec(lr * (sum(h_pos, 2) - sum(h_neg, 2)))
+    rbm.vbias += vec(lr * (sum(v_pos, 2) - sum(v_neg, 2)))
 
-#     return rbm
-# end
+    # Bottom-up pass of updates
+    for l=1:depth ## Something to check here !!
+        rbm=dbm[l+1]
+        v_pos,h_pos=array_h_pos[l-1:l]
+        v_neg,h_neg=array_h_neg[l:l+1]
+        calculate_weight_gradient!(rbm,h_pos,v_pos,h_neg,v_neg,lr,approx=approx)
+        if weight_decay == "l2"
+            regularize_weight_gradient!(rbm,lr;L2Penalty=decay_magnitude)
+        end
+        if weight_decay == "l1"
+            regularize_weight_gradient!(rbm,lr;L1Penalty=decay_magnitude)
+        end
+        update_weights!(rbm,approx)
+        rbm.hbias += vec(lr * (sum(h_pos, 2) - sum(h_neg, 2)))
+        rbm.vbias = copy(dbm[l].hbias) ## Constraining biases of visible units to be equal to biases of hidden units from shallower layer
+    end
+    return dbm
+end
 
 
 # """
