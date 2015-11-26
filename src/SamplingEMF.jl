@@ -136,9 +136,8 @@ function equilibrate(dbm::DBM, vis_init::Mat{Float64}, array_hid_init::Array{Arr
    return m_vis, array_m_hid
 end
 
-function clamped_equilibrate(dbm::DBM, vis_init::Mat{Float64}, array_hid_init::Array{Array{Float64},1}; iterations=3, approx="tap2", damp=0.5)
+function clamped_equilibrate(dbm::DBM, vis::Mat{Float64}, array_hid_init::Array{Array{Float64},1}; iterations=3, approx="tap2", damp=0.5)
    # Redefine names for clarity
-   vis = copy(vis_init)
    array_m_hid = copy(array_hid_init)
    depth = length(array_hid_init)
 
