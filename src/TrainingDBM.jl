@@ -99,10 +99,10 @@ function fit_batch!(dbm::DBM, vis::Mat{Float64};
     rbm.vbias += vec(lr * (sum(v_pos, 2) - sum(v_neg, 2)))
 
     # Bottom-up pass of updates
-    for l=1:depth ## Something to check here !!
-        rbm=dbm[l+1]
+    for l=2:depth 
+        rbm=dbm[l]
         v_pos,h_pos=array_h_pos[l-1:l]
-        v_neg,h_neg=array_h_neg[l:l+1]
+        v_neg,h_neg=array_h_neg[l-1:l]
         calculate_weight_gradient!(rbm,h_pos,v_pos,h_neg,v_neg,lr,approx=approx)
         if weight_decay == "l2"
             regularize_weight_gradient!(rbm,lr;L2Penalty=decay_magnitude)
