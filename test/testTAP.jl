@@ -8,7 +8,7 @@ function run_mnist()
     normalize_samples!(X)
     binarize!(X;threshold=0.01)
 
-    TrainSet = X
+    TrainSet = X[:,1:1000]
     ValidSet = []
     HiddenUnits = 500;
     Epochs = 10;

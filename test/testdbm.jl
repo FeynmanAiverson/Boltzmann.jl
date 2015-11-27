@@ -7,8 +7,8 @@ function run_mnist()
     binarize!(X;threshold=0.01)
 
     X=X[:,1:1000]
-    TrainSet = X
-    ValidSet = []
+    TrainSet = X[:,1:900]
+    ValidSet = X[:,901:1000]
     Epochs = 10;
     MCMCIter = 1;
     EMFIter = 3
@@ -31,11 +31,25 @@ function run_mnist()
 
 	println(dbm)
 	println(dbm[1])
+
+
 	# mhid2=ProbHidAtLayerCondOnVis(dbm,X,2)
 	# println(size(mhid2)) 
 	# mhid1=ProbHidCondOnNeighbors(dbm[1],X,dbm[2],mhid2)
 	# println(size(mhid1))
 	# println(mhid1)  
+	finaldbm,monitor = fit(dbm, X; persistent=true, 
+						    lr=LearnRate, 
+							n_iter=Epochs, 
+							batch_size=100, 
+							NormalizationApproxIter=EMFIter,
+			             	weight_decay="l1",decay_magnitude=0.01,
+			             	validation=ValidSet,
+			             	monitor_every=MonitorEvery,
+			             	approx="tap2",
+			            	persistent_start=EMFPersistStart)
+	WriteMonitorChartPDF(finaldbm[1],monitor,X,"testmonitor_dbm_tap2.pdf")
+    SaveMonitorHDF5(monitor,"testmonitor_dbm_tap2.h5")
 
 end
 
