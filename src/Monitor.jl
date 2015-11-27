@@ -97,3 +97,44 @@ function UpdateMonitor!(rbm::RBM,mon::Monitor,dataset::Mat{Float64},itr::Int;val
         mon.BatchTime_µs[li] = bt
     end 
 end
+
+function UpdateMonitor!(dbm::DBM,mon::Monitor,dataset::Mat{Float64},itr::Int;validation=[],bt=NaN,lr=NaN,mo=NaN)
+    depth=length(dbm)
+    nh = size(dbm[1].W,1)
+    for l=2:depth 
+        nh+=size(dbm[l].W,1)
+    end
+    nv = size(dbm[1].W,2)
+    N = nh + nv
+    nsamps = min(size(dataset,2),5000)      # Set maximum number of samples to test as 5000
+
+
+    if itr%mon.MonitorEvery==0
+        if mon.UseValidation 
+            vpl = mean(score_samples(dbm, validation))/N
+            vtl = mean(score_samples_TAP(dbm, validation))/N
+            vre = recon_error(dbm[1],validation)/N
+        else
+            vpl = NaN
+            vtl = NaN
+            vre = NaN
+        end
+        pl = mean(score_samples(dbm, dataset[:,1:nsamps]))/N  
+        tl = mean(score_samples_TAP(dbm, dataset[:,1:nsamps]))/N    
+        re = recon_error(dbm[1],dataset[:,1:nsamps])/N
+
+        mon.LastIndex+=1
+        li = mon.LastIndex
+
+        mon.PseudoLikelihood[li] = pl
+        mon.TAPLikelihood[li] = tl
+        mon.ReconError[li] = re
+        mon.ValidationPseudoLikelihood[li] = vpl
+        mon.ValidationTAPLikelihood[li] = vtl
+        mon.ValidationReconError[li] = vre
+        mon.Epochs[li] = itr
+        mon.Momentum[li] = mo
+        mon.LearnRate[li] = lr
+        mon.BatchTime_µs[li] = bt
+    end 
+end

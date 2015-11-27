@@ -42,7 +42,8 @@ export RBM,
        get_negative_samples,
        ProbHidInitCondOnVis,
        free_energy,
-       score_sample_TAP
+       score_samples_TAP,
+       score_samples
 
 include("core.jl")
 

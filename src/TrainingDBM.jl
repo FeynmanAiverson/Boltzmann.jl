@@ -198,7 +198,7 @@ function fit(dbm::DBM, X::Mat{Float64};
     info("  + Training Samples:     $n_samples")
     info("  + Features:             $n_features")
     info("  + Hidden Units:         $n_hidden")
-    info("  + Hidden Layers:               $depth")
+    info("  + Hidden Layers:        $depth")
     info("  + Epochs to run:        $n_iter")
     info("  + Persistent ?:         $persistent")
     info("  + Training approx:      $approx")
@@ -244,8 +244,8 @@ function fit(dbm::DBM, X::Mat{Float64};
         # Get the average wall-time in µs
         walltime_µs=(toq()/n_batches/N)*1e6
         
-        UpdateMonitor!(dbm[1],ProgressMonitor,X,itr;bt=walltime_µs,validation=validation)
-        ShowMonitor(dbm[1],ProgressMonitor,X,itr)
+        UpdateMonitor!(dbm,ProgressMonitor,X,itr;bt=walltime_µs,validation=validation)
+        ShowMonitor(dbm,ProgressMonitor,X,itr)
     end
 
     return dbm, ProgressMonitor

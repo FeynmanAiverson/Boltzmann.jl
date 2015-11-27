@@ -216,6 +216,90 @@ function ShowMonitor(rbm::RBM,mon::Monitor,X::Mat{Float64},itr::Int;filename=[])
     end
 end
 
+##################### DBM methods ###############################################################
+
+function WriteMonitorChartPDF(dbm::DBM,mon::Monitor,X::Mat{Float64},filename::AbstractString)
+    savefig = plt.figure(5;figsize=(12,15))
+    # Show Per-Epoch Progres
+    savefig[:add_subplot](321)
+        plot_scores(mon)
+        
+    savefig[:add_subplot](322)
+        plot_evolution(mon)      
+
+    # Show Receptive fields
+    savefig[:add_subplot](323)
+        plot_rf(dbm[1])
+
+    # Show the Visible chains/fantasy particle
+    savefig[:add_subplot](324)
+        plot_chain(dbm[1])
+
+    # Show the current visible biasing
+    savefig[:add_subplot](325)
+        # plot_vbias(rbm)
+        plot_hidden_activations(dbm[1],X)
+
+    # Show the distribution of weight values
+    savefig[:add_subplot](326)
+        plot_weightdist(dbm[1])
+
+    plt.savefig(filename;transparent=true,format="pdf",papertype="a4",frameon=true,dpi=300)
+    plt.close()
+end
+
+function ShowMonitor(dbm::DBM,mon::Monitor,X::Mat{Float64},itr::Int;filename=[])
+    fig = mon.FigureHandle
+
+    if mon.MonitorVisual && itr%mon.MonitorEvery==0
+        # Wipe out the figure
+        fig[:clf]()
+
+        # Show Per-Epoch Progres
+        fig[:add_subplot](321)
+            plot_scores(mon)
+            
+        fig[:add_subplot](322)
+            plot_evolution(mon)      
+
+        # Show Receptive fields
+        fig[:add_subplot](323)
+            plot_rf(dbm[1])
+
+        # Show the Visible chains/fantasy particle
+        fig[:add_subplot](324)
+            plot_chain(dbm[1])
+
+        # Show the current visible biasing
+        fig[:add_subplot](325)
+            # plot_vbias(rbm)
+            plot_hidden_activations(dbm[1],X)
+
+        # Show the distribution of weight values
+        fig[:add_subplot](326)
+            plot_weightdist(dbm[1])
+
+        figure_refresh(fig)  
+    end
+
+    if mon.MonitorText && itr%mon.MonitorEvery==0
+        li = mon.LastIndex
+        ce = mon.Epochs[li]
+        if mon.UseValidation
+            @printf("[Epoch %04d] Train(pl : %0.3f, tl : %0.3f), Valid(pl : %0.3f, tl : %0.3f)  [%0.3f µsec/batch/unit]\n",ce,
+                                                                                                   mon.PseudoLikelihood[li],
+                                                                                                   mon.TAPLikelihood[li],
+                                                                                                   mon.ValidationPseudoLikelihood[li],
+                                                                                                   mon.ValidationTAPLikelihood[li],
+                                                                                                   mon.BatchTime_µs[li])
+        else
+            @printf("[Epoch %04d] Train(pl : %0.3f, tl : %0.3f)  [%0.3f µsec/batch]\n",ce,
+                                                                           mon.PseudoLikelihood[li],
+                                                                           mon.TAPLikelihood[li],
+                                                                           mon.BatchTime_µs[li])
+        end
+    end
+end
 # function chart_likelihood_evolution(pseudo, tap; filename="")
 
 #     if length(filename) > 0

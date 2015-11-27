@@ -6,14 +6,14 @@ function run_mnist()
     normalize_samples!(X)
     binarize!(X;threshold=0.01)
 
-    X=X[:,1:1000]
-    TrainSet = X[:,1:900]
-    ValidSet = X[:,901:1000]
+    # X=X[:,1:10000]
+    TrainSet = X[:,1:40000]
+    ValidSet = X[:,59001:60000]
     Epochs = 10;
     MCMCIter = 1;
     EMFIter = 3
     LearnRate = 0.005
-    MonitorEvery=2
+    MonitorEvery=1
     EMFPersistStart=5
     HiddenUnits1 = 500
     HiddenUnits2 = 100
@@ -46,9 +46,10 @@ function run_mnist()
 			             	weight_decay="l1",decay_magnitude=0.01,
 			             	validation=ValidSet,
 			             	monitor_every=MonitorEvery,
+			             	monitor_vis=true,
 			             	approx="tap2",
 			            	persistent_start=EMFPersistStart)
-	WriteMonitorChartPDF(finaldbm[1],monitor,X,"testmonitor_dbm_tap2.pdf")
+	WriteMonitorChartPDF(finaldbm,monitor,X,"testmonitor_dbm_tap2.pdf")
     SaveMonitorHDF5(monitor,"testmonitor_dbm_tap2.h5")
 
 end
