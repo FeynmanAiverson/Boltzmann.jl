@@ -77,7 +77,7 @@ end
 """
 
 function ProbHidInitCondOnVis(net::Net, vis::Mat{Float64})
-    depth = length(net)-1 
+    depth = length(net)
     array_hid_init = Array(Array{Float64}, depth)
     array_hid_init[1] = ProbHidCondOnVis(net[1], vis)
     for k=2:depth

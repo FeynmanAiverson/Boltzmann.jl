@@ -179,7 +179,7 @@ function clamped_equilibrate(dbm::DBM, vis::Mat{Float64}, array_hid_init::Array{
 end
 
 ##-----------------------------------------------------------------------------##
-### To be deprecated
+### To be deprecated still used in Scoring.jl for the moment
 function iter_mag(rbm::RBM, vis::Mat{Float64}; n_times=3, approx="tap2")
     v_pos = vis
     h_pos = ProbHidCondOnVis(rbm, v_pos)

@@ -42,7 +42,7 @@ end
 function fit_batch!(dbm::DBM, vis::Mat{Float64};
                     persistent=true, lr=0.1, NormalizationApproxIter=1,
                     weight_decay="none",decay_magnitude=0.01, approx="CD")
-    depth = length(dbm)-1
+    depth = length(dbm)
 
     if approx=="naive" || contains(approx,"tap")
         array_h_pos_init = ProbHidInitCondOnVis(dbm, vis)
@@ -168,7 +168,7 @@ function fit(dbm::DBM, X::Mat{Float64};
 
     # TODO: This line needs to be changed to accomodate real-valued units
     @assert minimum(X) >= 0 && maximum(X) <= 1
-    depth=length(dbm)-1
+    depth=length(dbm)
     n_valid=0
     n_features = size(X, 1)
     n_samples = size(X, 2)
@@ -198,6 +198,7 @@ function fit(dbm::DBM, X::Mat{Float64};
     info("  + Training Samples:     $n_samples")
     info("  + Features:             $n_features")
     info("  + Hidden Units:         $n_hidden")
+    info("  + Hidden Layers:               $depth")
     info("  + Epochs to run:        $n_iter")
     info("  + Persistent ?:         $persistent")
     info("  + Training approx:      $approx")

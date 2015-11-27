@@ -23,9 +23,9 @@ function run_mnist()
     rbm2 = BernoulliRBM(HiddenUnits1, 	HiddenUnits2, (HiddenUnits1,1); momentum=0.5, sigma = 0.01)
     rbm3 = BernoulliRBM(HiddenUnits2, 	HiddenUnits3, (HiddenUnits2,1); momentum=0.5, sigma = 0.01)
 
-	layers = [("vis",  rbm1),
-	          ("hid1", rbm2),
-	          ("hid2", rbm3)]
+	layers = [("vishid1",  rbm1),
+	          ("hid1hid2", rbm2),
+	          ("hid2hid3", rbm3)]
 	dbm = DBM(layers)
 
 
