@@ -37,7 +37,10 @@ export RBM,
        plot_weightdist,
        chart_likelihood_evolution,
        ProbHidAtLayerCondOnVis,
-       ProbHidCondOnNeighbors
+       ProbHidCondOnNeighbors,
+       get_positive_samples,
+       get_negative_samples,
+       ProbHidInitCondOnVis
 
 include("core.jl")
 
