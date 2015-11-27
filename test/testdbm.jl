@@ -9,7 +9,7 @@ function run_mnist()
     # X=X[:,1:10000]
     TrainSet = X[:,1:40000]
     ValidSet = X[:,59001:60000]
-    Epochs = 10;
+    Epochs = 25;
     MCMCIter = 1;
     EMFIter = 3
     LearnRate = 0.005
@@ -43,7 +43,7 @@ function run_mnist()
 							n_iter=Epochs, 
 							batch_size=100, 
 							NormalizationApproxIter=EMFIter,
-			             	weight_decay="l1",decay_magnitude=0.01,
+			             	weight_decay="l2",decay_magnitude=0.01,
 			             	validation=ValidSet,
 			             	monitor_every=MonitorEvery,
 			             	monitor_vis=true,

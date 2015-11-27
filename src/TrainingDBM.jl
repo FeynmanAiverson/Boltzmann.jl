@@ -39,6 +39,11 @@ function get_positive_samples(dbm::DBM, vis::Mat{Float64}, array_hid_init::Array
     return v_pos, array_h_pos
 end
 
+# function pre_fit()
+    
+#     return dbm
+# end
+
 function fit_batch!(dbm::DBM, vis::Mat{Float64};
                     persistent=true, lr=0.1, NormalizationApproxIter=1,
                     weight_decay="none",decay_magnitude=0.01, approx="CD")
