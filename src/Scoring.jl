@@ -6,7 +6,7 @@ function free_energy(rbm::RBM, vis::Mat{Float64})
     return - vb - Wx_b_log
 end
 
-function free_energy(dbm::DBM, vis::Mat{Float64};n_iter=5)
+function free_energy(dbm::DBM, vis::Mat{Float64}; n_iter=5)
     depth=length(dbm)
     array_h_pos_init = ProbHidInitCondOnVis(dbm, vis)
     mv_pos, array_mh_pos = get_positive_samples(dbm, vis, array_h_pos_init, "tap2", n_iter)
@@ -95,13 +95,12 @@ end
 function score_samples_TAP(dbm::DBM, vis::Mat{Float64}; n_iter=5)
 
     depth=length(dbm)
-    array_h_pos_init = ProbHidInitCondOnVis(dbm, vis)
-    mv_pos, array_mh_pos = get_positive_samples(dbm, vis, array_h_pos_init, "tap2", n_iter)
-    mv_neg, array_mh_neg = get_negative_samples(dbm, vis, array_mh_pos, "tap2", n_iter)
+    array_h_init = ProbHidInitCondOnVis(dbm, vis)
+    mv_neg, array_mh_neg = get_negative_samples(dbm, vis, array_h_init, "tap2", n_iter)
 
     rbm=dbm[1]
-    m_vis = copy(mv_pos)
-    m_hid = copy(array_mh_pos[1])
+    m_vis = copy(mv_neg)
+    m_hid = copy(array_mh_neg[1])
     eps=1e-6
     m_vis = max(m_vis, eps)
     m_vis = min(m_vis, 1.0-eps)
@@ -115,9 +114,9 @@ function score_samples_TAP(dbm::DBM, vis::Mat{Float64}; n_iter=5)
     Onsager = - 0.5 * sum(gemm('N','N',rbm.W2,m_vis-m_vis2).*(m_hid-m_hid2),1)    
 
     for l=2:depth
-        bm=dbm[l]
-        m_vis = copy(array_mh_pos[l-1])
-        m_hid = copy(array_mh_pos[l])
+        rbm=dbm[l]
+        m_vis = copy(array_mh_neg[l-1])
+        m_hid = copy(array_mh_neg[l])
         eps=1e-6
         m_vis = max(m_vis, eps)
         m_vis = min(m_vis, 1.0-eps)
@@ -131,9 +130,8 @@ function score_samples_TAP(dbm::DBM, vis::Mat{Float64}; n_iter=5)
         Onsager += - 0.5 * sum(gemm('N','N',rbm.W2,m_vis-m_vis2).*(m_hid-m_hid2),1)  
     end
 
-    fe = U_naive + Onsager - S
+    fe_tap = U_naive + Onsager - S
 
-
-    fe = free_energy(rbm, vis)
+    fe = free_energy(dbm, vis; n_iter=n_iter)
     return fe_tap - fe
 end 

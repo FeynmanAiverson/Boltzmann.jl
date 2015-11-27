@@ -40,7 +40,9 @@ export RBM,
        ProbHidCondOnNeighbors,
        get_positive_samples,
        get_negative_samples,
-       ProbHidInitCondOnVis
+       ProbHidInitCondOnVis,
+       free_energy,
+       score_sample_TAP
 
 include("core.jl")
 
