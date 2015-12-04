@@ -43,7 +43,8 @@ export RBM,
        ProbHidInitCondOnVis,
        free_energy,
        score_samples_TAP,
-       score_samples
+       score_samples,
+       fit_doubled
 
 include("core.jl")
 
