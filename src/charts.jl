@@ -71,9 +71,9 @@ function plot_scores(mon::Monitor)
     plt.xlim((1,mon.Epochs[mon.LastIndex]))        
     plt.grid("on")        
     if mon.UseValidation
-        plt.legend(handles=[hpl;hvpl;htl;hvtl;hre;hvre],loc=2)
+        plt.legend(handles=[hpl;hvpl;htl;hvtl;hre;hvre],loc=3,fontsize=10)
     else
-        plt.legend(handles=[hpl;htl;hre],loc=2)
+        plt.legend(handles=[hpl;htl;hre],loc=3,fontsize=10)
     end
 end
 
