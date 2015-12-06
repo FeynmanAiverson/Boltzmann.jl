@@ -11,10 +11,8 @@ with modificaitons made by the SPHINX Team @ ENS Paris.
 
 Installation
 ------------
-Currently, this package is unregistered with the Julia package manager. Once the modifications
-here are feature complete, we can either make the fork permanent or request a merge back into
-the [dfdx/Boltzmann.jl](https://github.com/dfdx/Boltzmann.jl) package. For now, installation
-should be accomplished via:
+Currently, this package is unregistered with the Julia package manager. 
+Once the modifications here are feature complete, we can either make the fork permanent or request a merge back into the [dfdx/Boltzmann.jl](https://github.com/dfdx/Boltzmann.jl) package. For now, installation should be accomplished via:
 
 ```julia
     Pkg.clone("https://github.com/sphinxteam/Boltzmann.jl")
@@ -58,14 +56,22 @@ One can find the script for this example inside the `/examples` directory [of th
 Sampling
 --------
 
-One can **generate** vectors similar to given ones,
+After training an RBM, one can generate samples from the distribution it has been trained to model. To start the sampling chain, one needs to provide an initialization to the visible layer. This can be either a sample from the training set or some random initialization, depending on the task to be accomplished. Below we see a short script to accomplish this sampling. 
 
 ```julia
-    x = ... 
-    x_new = generate(rbm, x)
-```
+# Experimental Parameters
+    NFeatures = 100
 
-RBMs can handle both - dense and sparse arrays. It cannot, however, handle DataArrays because it's up to application how to treat missing values.
+    # Generate a random binary initialization
+    vis_init = rand(NFeatures,1)
+    binarize!(vis_init;threshold=0.5)
+
+    # Obtain the number of desired samples
+    vis_samples = generate(rbm,       # Trained RBM Model to sample from
+                           vis_init,   # Starting point for sampling chain
+                           "CD",       # Sampling method, here, MCMC/Gibbs
+                           100)        # Number of steps to take on sampling chain
+```
 
 
 RBM Variants
