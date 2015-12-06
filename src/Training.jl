@@ -71,6 +71,23 @@ function get_negative_samples(rbm::RBM,vis_init::Mat{Float64},hid_init::Mat{Floa
     return v_neg, h_neg
 end
 
+function generate(rbm::RBM,vis_init::Mat{Float64},approx::AbstractString,SamplingIterations::Int)
+    Nsamples = size(vis_init,2)
+    Nhid     = size(rbm.hbias,1)
+    h_init  = zeros(Nsamples,Nhid)
+
+    if approx=="naive" || contains(approx,"tap")
+        _, hid_mag = equilibrate(rbm,vis_init,hid_init; iterations=SamplingIterations, approx=approx)
+    end
+
+    if approx=="CD"
+        _, hid_mag, _, _ = MCMC(rbm, vis_init; iterations=SamplingIterations, StartMode="visible")
+    end
+
+    samples,_ = sample_visibles(rbm,hid_mag)
+
+    return reshape(samples,rbm.VisShape)
+end
 
 function fit_batch!(rbm::RBM, vis::Mat{Float64};
                     persistent=true, lr=0.1, NormalizationApproxIter=1,
