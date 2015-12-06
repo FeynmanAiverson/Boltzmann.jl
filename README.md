@@ -23,34 +23,42 @@ should be accomplished via:
 RBM Basic Usage
 ---------------
 
-Train RBM:
+Below, we show a basic script to train a binary RBM on random training data. For this example, persistent contrastive divergence with one step on the MCMC sampling chain (PCD-1) is used. Finally, we also point out the monitoring and charting functionality which is passed as an optional argument to the `fit` procedure.
 
 ```julia
     using Boltzmann
 
-    X = randn(100, 2000)    # 2000 observations (examples) 
-                            #  with 100 variables (features) each
-    X = (X + abs(minimum(X))) / (maximum(X) - minimum(X)) # scale X to [0..1]
-    rbm = GRBM(100, 50)     # define Gaussian RBM with 100 visible (input) 
-                            #  and 50 hidden (output) variables
-    fit(rbm, X)             # fit model to data 
+    # Experimental parameters for this smoke test
+    NFeatures    = 100
+    FeatureShape = (10,10)
+    NSamples     = 2000
+    NHidden      = 50
+
+    # Generate a random test set in [0,1]
+    X = rand(NFeatures, NSamples)    
+    binarize!(X;threshold=0.5)                        
+
+    # Initialize the RBM Model
+    rbm = BernoulliRBM(NFeatures, NHidden, FeatureShape)
+
+    # Run CD-1 Training with persistence
+    rbm = fit(rbm,X; n_iter        = 30,      # Training Epochs
+                     batch_size    = 50,      # Samples per minibatch
+                     persistent    = true,    # Use persistent chains
+                     approx        = "CD",    # Use CD (MCMC) Sampling
+                     monitor_every = 1,       # Epochs between scoring
+                     monitor_vis   = true)    # Show live charts
 ```
 
-(for more meaningful dataset see [MNIST Example](https://github.com/dfdx/Boltzmann.jl/blob/master/examples/mnistexample.jl))
+MNIST Example
+-------------
 
-After model is fitted, you can **extract learned components** (a.k.a. weights): 
+One can find the script for this example inside the `/examples` directory [of the repository](https://github.com/sphinxteam/Boltzmann.jl/blob/master/examples/mnistexample.jl).
 
-```julia
-    comps = components(rbm)
-```
+Sampling
+--------
 
-**transform** data vectors into new higher-level representation (e.g. for further classification): 
-
-```julia
-    Xt = transform(rbm, X)  # vectors of X have length 100, vectors of Xt - length 50
-```
-
-or **generate** vectors similar to given ones (e.g. for recommendation, see example [here](https://github.com/dfdx/lastfm-rbm))
+One can **generate** vectors similar to given ones,
 
 ```julia
     x = ... 
@@ -60,54 +68,14 @@ or **generate** vectors similar to given ones (e.g. for recommendation, see exam
 RBMs can handle both - dense and sparse arrays. It cannot, however, handle DataArrays because it's up to application how to treat missing values.
 
 
-RBM Kinds
----------
+RBM Variants
+------------
 
-This package provides implementation of the 2 most popular kinds of restricted Boltzmann machines: 
+Currently, this version of the Boltzmann package only provides support for the following RBM variants:
 
- - `BernoulliRBM`: RBM with binary visible and hidden units
- - `GRBM`: RBM with Gaussian visible and binary hidden units
+ - `BernoulliRBM`: RBM with binary visible and hidden units.
 
-Bernoulli RBM is classic one and works great for modeling binary (e.g. like/dislike) and nearly binary (e.g. logistic-based) data. Gaussian RBM works better when visible variables approximately follow normal distribution, which is often the case e.g. for image data. 
-
-
-Deep Belief Networks
---------------------
-
-DBNs are created as a stack of named RBMs. Below is an example of training DBN for MNIST dataset:
-
-```julia
-    using Boltzmann
-    using MNIST
-
-    X, y = traindata()
-    X = X[:, 1:1000]                     # take only 1000 observations for speed
-    X = X / (maximum(X) - (minimum(X)))  # normalize to [0..1]
-
-    layers = [("vis", GRBM(784, 256)),
-              ("hid1", BernoulliRBM(256, 100)),
-              ("hid2", BernoulliRBM(100, 100))]
-    dbn = DBN(layers)
-    fit(dbn, X)
-    transform(dbn, X)
-```
-
-Deep Autoencoders
------------------
-
-Once built, DBN can be converted into a deep autoencoder. Continuing previous example:
-
-```julia
-    dae = unroll(dbn)
-```
-DAEs cannot be trained directly, but can be used to transform input data:
-
-```julia
-    transform(dae, X)
-```
-
-In this case output will have the same dimensionality as input, but with a noise removed.
-
+Support for real valued visibile units is still in progress. Some basic functionality for this feature was provided in limited, though unverified way, in the [upstream repository of this fork](https://https://github.com/dfdx/Boltzmann.jl). We suggest waiting until a verified implementation of the G-RBM is provided, here.
 
 Integration with Mocha
 ----------------------
