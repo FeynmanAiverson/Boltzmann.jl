@@ -133,27 +133,27 @@ end
 function WriteMonitorChartPDF(rbm::RBM,mon::Monitor,X::Mat{Float64},filename::AbstractString)
     savefig = plt.figure(5;figsize=(12,15))
     # Show Per-Epoch Progres
-    savefig[:add_subplot](321)
+    savefig[:add_subplot](231)
         plot_scores(mon)
         
-    savefig[:add_subplot](322)
+    savefig[:add_subplot](232)
         plot_evolution(mon)      
 
     # Show Receptive fields
-    savefig[:add_subplot](323)
+    savefig[:add_subplot](233)
         plot_rf(rbm)
 
     # Show the Visible chains/fantasy particle
-    savefig[:add_subplot](324)
+    savefig[:add_subplot](234)
         plot_chain(rbm)
 
     # Show the current visible biasing
-    savefig[:add_subplot](325)
+    savefig[:add_subplot](235)
         # plot_vbias(rbm)
         plot_hidden_activations(rbm,X)
 
     # Show the distribution of weight values
-    savefig[:add_subplot](326)
+    savefig[:add_subplot](236)
         plot_weightdist(rbm)
 
     plt.savefig(filename;transparent=true,format="pdf",papertype="a4",frameon=true,dpi=300)
@@ -171,27 +171,27 @@ function ShowMonitor(rbm::RBM,mon::Monitor,X::Mat{Float64},itr::Int;filename=[])
         fig[:clf]()
 
         # Show Per-Epoch Progres
-        fig[:add_subplot](321)
+        fig[:add_subplot](231)
             plot_scores(mon)
             
-        fig[:add_subplot](322)
+        fig[:add_subplot](232)
             plot_evolution(mon)      
 
         # Show Receptive fields
-        fig[:add_subplot](323)
+        fig[:add_subplot](233)
             plot_rf(rbm)
 
         # Show the Visible chains/fantasy particle
-        fig[:add_subplot](324)
+        fig[:add_subplot](234)
             plot_chain(rbm)
 
         # Show the current visible biasing
-        fig[:add_subplot](325)
+        fig[:add_subplot](235)
             # plot_vbias(rbm)
             plot_hidden_activations(rbm,X)
 
         # Show the distribution of weight values
-        fig[:add_subplot](326)
+        fig[:add_subplot](236)
             plot_weightdist(rbm)
 
         figure_refresh(fig)  
