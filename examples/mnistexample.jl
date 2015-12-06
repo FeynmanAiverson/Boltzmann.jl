@@ -1,45 +1,47 @@
-
 using Boltzmann
 using MNIST
 
 function run_mnist()
     # Set parameters
-    Epochs = 20
-    HiddenUnits = 256
+    Epochs         = 20
+    HiddenUnits    = 256
+    Approx         = "CD"
+    ApproxSteps    = 1
+    LearnRate      = 0.005
+    MonitorEvery   = 5
+    PersistStart   = 5
+    Momentum       = 0.5
+    DecayMagnitude = 0.01
+    DecayType      = "l1"
 
-
-    # Get all MNIST training data
-    X, y = traindata()  # test data is smaller, no need to downsample
-    normalize_samples!(X)
-    binarize!(X;level=0.2)
-
-    # Split validation set
-    Gibbs = 1
-    IterMag = 3
-    LearnRate = 0.005
-    MonitorEvery=5
-    PersistStart=5
-    TrainSet = X[:,1:50000]
-    ValidSet = X[:,50001:end]
+    # Load MNIST Training data
+    X, y = traindata()              # Raw data and labels
+    normalize_samples!(X)           # Pin to range [0,1]
+    binarize!(X;threshold=0.001)    # Create binary data
+    # Hold out a validation set
+    TrainSet     = X[:,1:50000]
+    ValidSet     = X[:,50001:end]
 
     # Initialize Model
-    m = BernoulliRBM(28*28, HiddenUnits,(28,28); momentum=0.5, dataset=TrainSet)
+    m = BernoulliRBM(28*28, HiddenUnits,(28,28); 
+                     momentum  = Momentum, 
+                     TrainData = TrainSet,
+                     sigma     = 0.001)
 
     # Run Training
-    fit(m, TrainSet; n_iter=Epochs, 
-                        weight_decay="l2",
-                        decay_magnitude=0.001,
-                        lr=LearnRate,
-                        persistent=true,
-                        validation=ValidSet,
-                        n_gibbs=IterMag,
-                        monitor_every=MonitorEvery,
-                        monitor_vis=true,
-                        approx="tap2",
-                        persistent_start=PersistStart)
+    rbm,monitor = fit(m, TrainSet; n_iter           = Epochs, 
+                                   weight_decay     = DecayType,
+                                   decay_magnitude  = DecayMagnitude,
+                                   lr               = LearnRate,
+                                   persistent       = true,
+                                   validation       = ValidSet,
+                                   NormalizationApproxIter = ApproxSteps,
+                                   monitor_every    = MonitorEvery,
+                                   monitor_vis      = true,
+                                   approx           = Approx,
+                                   persistent_start = PersistStart)
 
-    # Display Result
-    chart_weights(m.W,(28,28))
+
 end
 
 run_mnist()
