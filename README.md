@@ -48,6 +48,30 @@ Below, we show a basic script to train a binary RBM on random training data. For
                      monitor_vis   = true)    # Show live charts
 ```
 
+Extended Mean-Field (EMF) Approximation
+---------------------------------------
+
+Besides the use of the sampling based-based default CD RBM training, we have also implemented the extended mean-field approach of
+
+> M. Gabrié, E. W. Tramel, F. Krzakala, ``Training restricted Boltzmann machines via the Thouless-Andreson-Palmer free energy,'' in Proc. Conf. on Neural Info. Processing Sys. (NIPS), Montreal, Canada, June 2015.
+
+In this approach, rather than using MCMC to produce a number of independent samples used to collect the statistics in the negative training phase, 1st, 2nd, and 3rd order mean-field approximations are used to estimate equilibrium magnetizations on both the visible and hidden units. These real-valued magnetizations are then used in lieu of binary particles.
+
+```julia
+    ApproxIter = 3      # How many fixed-point EMF steps to take
+
+    # ...etc...
+
+    # Train using 1st order mean-field (naïve mean field)
+    fit(rbm1,TrainData; approx="naive", NormalizationApproxIter=ApproxIter)
+
+    # Train using 2nd order mean-field
+    fit(rbm2,TrainData; approx="tap2", NormalizationApproxIter=ApproxIter)
+
+    # Train using 3rd order mean-field
+    fit(rbm3,TrainData; approx="tap3", NormalizationApproxIter=ApproxIter)
+```
+
 MNIST Example
 -------------
 
