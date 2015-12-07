@@ -415,14 +415,44 @@ function fit_doubled(rbm,X::Mat{Float64}, which::AbstractString;
     return rbm, ProgressMonitor
 end
 
-# function pre_fit(dbm::DBM, X::Mat{Float64};
-#              persistent=true, lr=0.1, n_iter=10, batch_size=100, NormalizationApproxIter=1,
-#              weight_decay="none",decay_magnitude=0.01,validation=[],
-#              monitor_every=5,monitor_vis=false, approx="CD",
-#              persistent_start=1)
+function pre_fit(dbm::DBM, X::Mat{Float64};
+             persistent=true, lr=0.1, n_iter=10, batch_size=100, NormalizationApproxIter=1,
+             weight_decay="none",decay_magnitude=0.01,validation=[],
+             monitor_every=5,monitor_vis=false, approx="CD",
+             persistent_start=1)
 
-#     depth = length(dbm)
+    depth = length(dbm)
 
-    
-#     return dbm
-# end
+    rbm, _ = fit_doubled(dbm[1], X, "input";
+             persistent=persistent, lr=lr, n_iter=n_iter, batch_size=batch_size, NormalizationApproxIter=NormalizationApproxIter,
+             weight_decay=weight_decay,decay_magnitude=decay_magnitude,validation=validation,
+             monitor_every=monitor_every,monitor_vis=monitor_vis, approx=approx, persistent_start=persistent_start)
+    layers =  [("vishid1", rbm)]
+
+    vis = X
+    hid, _ = sample_hiddens(dbm[1], 2.*vis)  # double input to activate the hiddens
+    for l=2:(depth-1)
+        vis = hid
+        println(dbm[l])
+        rbm, _ = fit(dbm[l],vis;persistent=persistent, lr=lr, n_iter=n_iter, batch_size=batch_size, NormalizationApproxIter=NormalizationApproxIter,
+             weight_decay=weight_decay,decay_magnitude=decay_magnitude,validation=validation,
+             monitor_every=monitor_every,monitor_vis=monitor_vis, approx=approx, persistent_start=persistent_start)
+        hid, _ = sample_hiddens(rbm, vis)
+        rbm.W=rbm.W./2
+        rbm.W2=rbm.W.*rbm.W
+        rbm.W3=rbm.W2.*rbm.W
+        rbm.vbias=layers[l-1][2].hbias
+        rbm.hbias=rbm.hbias./2
+        push!(layers,("hid$(l-1)hid$l",rbm))
+    end
+
+    vis = hid
+    rbm, _ = fit_doubled(dbm[depth], vis,"output";persistent=persistent, lr=lr, n_iter=n_iter, batch_size=batch_size, NormalizationApproxIter=NormalizationApproxIter,
+             weight_decay=weight_decay,decay_magnitude=decay_magnitude,validation=validation,
+             monitor_every=monitor_every,monitor_vis=monitor_vis, approx=approx, persistent_start=persistent_start)
+    push!(layers,("hid$(depth-1)hid$depth",rbm))
+   
+    dbm = DBM(layers)
+
+    return dbm
+end

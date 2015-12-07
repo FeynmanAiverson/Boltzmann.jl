@@ -44,7 +44,8 @@ export RBM,
        free_energy,
        score_samples_TAP,
        score_samples,
-       fit_doubled
+       fit_doubled,
+       pre_fit
 
 include("core.jl")
 
