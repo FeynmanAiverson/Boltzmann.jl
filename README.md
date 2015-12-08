@@ -51,7 +51,7 @@ Below, we show a basic script to train a binary RBM on random training data. For
 Extended Mean-Field (EMF) Approximation
 ---------------------------------------
 
-Besides the use of the sampling based-based default CD RBM training, we have also implemented the extended mean-field approach of
+Besides the use of the sampling-based default CD RBM training, we have also implemented the extended mean-field approach of
 
 > M. Gabrié, E. W. Tramel, F. Krzakala, ``Training restricted Boltzmann machines via the Thouless-Andreson-Palmer free energy,'' in Proc. Conf. on Neural Info. Processing Sys. (NIPS), Montreal, Canada, June 2015.
 
