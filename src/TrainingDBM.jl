@@ -1,4 +1,3 @@
-
 using Distributions
 using ProgressMeter
 using Base.LinAlg.BLAS
@@ -11,7 +10,7 @@ using PyCall
 
 import StatsBase.fit
 
-function get_negative_samples(dbm::DBM, vis_init::Mat{Float64}, array_hid_init::Array{Array{Float64},1},approx::AbstractString, iterations::Int)
+function get_negative_samples(dbm::DBM, vis_init::Mat{Float64}, array_hid_init::Array{Array{Float64},1}, approx::AbstractString, iterations::Int)
     if approx=="naive" || contains(approx,"tap")
         v_neg, array_h_neg = equilibrate(dbm,vis_init,array_hid_init; iterations=iterations, approx=approx)
     end
@@ -308,7 +307,7 @@ function fit_doubled(rbm,X::Mat{Float64}, which::AbstractString;
     N = n_hidden+n_features
     
     if which=="input"
-        rbmaux = BernoulliRBM(2*n_features, n_hidden, (2*n_features,1); momentum=rbm.momentum, sigma = 0.01)
+        rbmaux = BernoulliRBM(2*n_features, n_hidden, (2*rbm.VisShape[1],rbm.VisShape[2]); momentum=rbm.momentum, sigma = 0.01)
         rbmaux.W = [rbm.W rbm.W]
         X = [X ; X]
 
@@ -327,6 +326,7 @@ function fit_doubled(rbm,X::Mat{Float64}, which::AbstractString;
     # Create the historical monitor
     ProgressMonitor = Monitor(n_iter,monitor_every;monitor_vis=monitor_vis,
                                                    validation=flag_use_validation)
+    ProgressMonitor.FigureHandle=plt.figure("DBM";figsize=(12,15))
 
     # Print info to user
     m_ = rbmaux.momentum
@@ -354,7 +354,7 @@ function fit_doubled(rbm,X::Mat{Float64}, which::AbstractString;
 
     # Random initialization of the persistent chains
     rbmaux.persistent_chain_vis,_ = random_columns(X,batch_size)
-    rbmaux.persistent_chain_hid = ProbHidCondOnVis(rbmaux, rbmaux.persistent_chain_vis)
+    rbmaux.persistent_chain_hid   = ProbHidCondOnVis(rbmaux, rbmaux.persistent_chain_vis)
 
     use_persistent = false
     for itr=1:n_iter
@@ -389,7 +389,7 @@ function fit_doubled(rbm,X::Mat{Float64}, which::AbstractString;
         
         # Get the average wall-time in µs
         walltime_µs=(toq()/n_batches/N)*1e6
-        
+
         UpdateMonitor!(rbmaux,ProgressMonitor,X,itr;bt=walltime_µs,validation=validation)
         ShowMonitor(rbmaux,ProgressMonitor,X,itr)
     end
