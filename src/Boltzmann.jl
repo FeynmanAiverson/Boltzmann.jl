@@ -20,7 +20,7 @@ export RBM,
        chart_weights_distribution,
        chart_activation_distribution,
        binarize,
-       binarize!,
+       binarize!,       
        normalize,
        normalize!,
        normalize_samples,
@@ -34,7 +34,8 @@ export RBM,
        plot_chain,
        plot_vbias,
        plot_weightdist,
-       chart_likelihood_evolution
+       chart_likelihood_evolution,
+       PinField!
 
 include("core.jl")
 
