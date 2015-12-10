@@ -3,7 +3,6 @@ using Base.LinAlg.BLAS
 
 ### Base MF definitions
 #### Naive mean field
-## TODO : implement methods for intermediate layers
 function mag_vis_naive(rbm::RBM, m_hid::Mat{Float64}) ## to be constrained to being only Bernoulli
     buf = gemm('T', 'N', rbm.W, m_hid) .+ rbm.vbias
     return logsig(buf)
@@ -17,6 +16,21 @@ function mag_hid_naive(rbm::RBM, m_vis::Mat{Float64})
 end    
 
 mag_hid_naive(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64})=mag_hid_naive(rbm, m_vis) 
+
+function mag_hid_naive(rbm1::RBM, m_vis::Mat{Float64}, rbm2::RBM, m_hid2::Mat{Float64})
+    buf = rbm1.hbias .+ gemm('N', 'N', rbm1.W, m_vis) .+ gemm('T', 'N', rbm2.W, m_hid2)   
+    return logsig(buf)
+end
+
+mag_hid_naive(rbm1::RBM, m_vis::Mat{Float64}, rbm2::RBM, 
+                                m_hid2::Mat{Float64}, m_hid1::Mat{Float64}) = mag_hid_naive(rbm1, m_vis, rbm2, m_hid2)
+
+function mag_hid_clamped_naive(rbm1::RBM, vis::Mat{Float64}, rbm2::RBM, m_hid2::Mat{Float64})
+    buf = rbm1.hbias .+ gemm('N', 'N', rbm1.W, vis) .+ gemm('T', 'N', rbm2.W, m_hid2)   
+    return logsig(buf)
+end
+
+mag_hid_clamped_naive(rbm1::RBM, vis::Mat{Float64}, rbm2::RBM, m_hid2::Mat{Float64}, m_hid1::Mat{Float64}) = mag_hid_clamped_naive(rbm1, vis, rbm2, m_hid2)
   
 #### Second order development
 function mag_vis_tap2(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64}) ## to be constrained to being only Bernoulli
@@ -48,7 +62,6 @@ function mag_hid_clamped_tap2(rbm1::RBM, vis::Mat{Float64}, rbm2::RBM, m_hid2::M
 end
 
 #### Third order development
-## TODO : implement methods for intermediate layers
 function mag_vis_tap3(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64}) ## to be constrained to being only Bernoulli
     buf = gemm('T', 'N', rbm.W, m_hid) .+ rbm.vbias
     second_order = gemm('T', 'N', rbm.W2, m_hid-abs2(m_hid)).*(0.5-m_vis)
@@ -67,6 +80,25 @@ function mag_hid_tap3(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64})
     return logsig(buf)
 end
 
+function mag_hid_tap3(rbm1::RBM, m_vis::Mat{Float64}, rbm2::RBM, m_hid2::Mat{Float64}, m_hid1::Mat{Float64})
+    buf = rbm1.hbias .+ gemm('N', 'N', rbm1.W, m_vis) .+ gemm('T', 'N', rbm2.W, m_hid2)   
+    second_order = gemm('N', 'N', rbm1.W2, m_vis-abs2(m_vis)).*(0.5-m_hid1) .+ gemm('T', 'N', rbm2.W2, m_hid2-abs2(m_hid2)).*(0.5-m_hid1)
+    third_order = gemm('N', 'N', rbm1.W3, abs2(m_vis).*(1.-m_vis)).*(1/3-2*(m_hid1-abs2(m_hid1))) .+ gemm('T', 'N', rbm2.W3, abs2(m_hid2).*(1.-m_hid2)).*(1/3-2*(m_hid1-abs2(m_hid1)))
+    axpy!(1.0, second_order, buf)
+    axpy!(1.0, third_order, buf)
+    return logsig(buf)
+end
+
+function mag_hid_clamped_tap3(rbm1::RBM, vis::Mat{Float64}, rbm2::RBM, m_hid2::Mat{Float64}, m_hid1::Mat{Float64})
+    buf = rbm1.hbias .+ gemm('N', 'N', rbm1.W, vis) .+ gemm('T', 'N', rbm2.W, m_hid2)   
+    second_order = gemm('T', 'N', rbm2.W2, m_hid2-abs2(m_hid2)).*(0.5-m_hid1)
+    third_order = gemm('T', 'N', rbm2.W3, abs2(m_hid2).*(1.-m_hid2)).*(1/3-2*(m_hid1-abs2(m_hid1)))
+    axpy!(1.0, second_order, buf)
+    axpy!(1.0, third_order, buf)
+    return logsig(buf)
+end
+
+##########################################################################
 function equilibrate(rbm::RBM, vis_init::Mat{Float64}, hid_init::Mat{Float64}; iterations=3, approx="tap2", damp=0.5)
     # Redefine names for clarity
     m_vis = copy(vis_init)
@@ -100,10 +132,10 @@ function equilibrate(dbm::DBM, vis_init::Mat{Float64}, array_hid_init::Array{Arr
 
    # Set the proper iteration based on the approximation type
    if approx == "naive"
-      mag_vis = mag_vis_naive    ## TODO : implement methods for intermediate layers
+      mag_vis = mag_vis_naive    
       mag_hid = mag_hid_naive
    elseif approx == "tap3"
-      mag_vis = mag_vis_tap3     ## TODO : implement methods for intermediate layers
+      mag_vis = mag_vis_tap3  
       mag_hid = mag_hid_tap3
    else    
       mag_vis = mag_vis_tap2
@@ -142,14 +174,14 @@ function clamped_equilibrate(dbm::DBM, vis::Mat{Float64}, array_hid_init::Array{
    depth = length(array_hid_init)
 
    # Set the proper iteration based on the approximation type
-   if approx == "naive"
-      # mag_vis = mag_vis_naive    ## TODO : implement methods for intermediate layers
-      # mag_hid = mag_hid_naive
-   elseif approx == "tap3"
-      # mag_vis = mag_vis_tap3     ## TODO : implement methods for intermediate layers
-      # mag_hid = mag_hid_tap3
+   if approx == "naive" 
+      mag_hid = mag_hid_naive
+      mag_hid_clamped = mag_hid_clamped_naive
+   elseif approx == "tap3"  
+      mag_hid = mag_hid_tap3
+      mag_hid_clamped = mag_hid_clamped_tap3
    else    
-      mag_hid         = mag_hid_tap2
+      mag_hid = mag_hid_tap2
       mag_hid_clamped = mag_hid_clamped_tap2
    end 
 
