@@ -6,7 +6,7 @@ Boltzmann.jl
 
 Restricted Boltzmann machines and deep belief networks in Julia.
 This particular package is a fork of [dfdx/Boltzmann.jl](https://github.com/dfdx/Boltzmann.jl) 
-with modificaitons made by the SPHINX Team @ ENS Paris.
+with modifications made by the SPHINX Team @ ENS Paris.
 
 
 Installation
