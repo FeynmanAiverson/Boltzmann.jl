@@ -8,7 +8,7 @@ function save_params(file::HDF5File, rbm::RBM, name::AbstractString)
     write(file, "$(name)___bias", rbm.hbias)
 end
 
-function save_params(filename::HDF5File, rbm::RBM, name::AbstractString)
+function save_params(file::HDF5File, rbm::RBM, name::AbstractString)
     write(file, "$(name)___weight", rbm.W')
     write(file, "$(name)___vbias", rbm.vbias)
     write(file, "$(name)___bias", rbm.hbias)
