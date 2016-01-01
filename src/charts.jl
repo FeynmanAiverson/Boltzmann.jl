@@ -250,7 +250,7 @@ end
 
 function ShowMonitor(dbm::DBM,mon::Monitor,X::Mat{Float64},itr::Int;filename=[])
     fig = mon.FigureHandle
-
+    
     if mon.MonitorVisual && itr%mon.MonitorEvery==0
         # Wipe out the figure
         fig[:clf]()

@@ -9,7 +9,7 @@ function run_mnist()
 	# X=X[:,1:10000]
 	TrainSet = X[:,1:1000]
 	ValidSet = X[:,59001:60000]
-	Epochs = 1;
+	Epochs = 3;
 	MCMCIter = 1;
 	EMFIter = 3
 	LearnRate = 0.005
@@ -18,6 +18,7 @@ function run_mnist()
 	HiddenUnits1 = 500
 	HiddenUnits2 = 100
 	HiddenUnits3 = 10
+	approx="MF"
 
 	rbm1 = BernoulliRBM(28*28, 			HiddenUnits1, (28,28); momentum=0.5, TrainData=TrainSet, sigma = 0.01)
 	rbm2 = BernoulliRBM(HiddenUnits1, 	HiddenUnits2, (HiddenUnits1,1); momentum=0.5, sigma = 0.01)
@@ -32,48 +33,48 @@ function run_mnist()
 	println(dbm)
 	println(dbm[1])
 
-	# finalrbm,monitor = fit_doubled(rbm1,TrainSet,"output";persistent=true, 
-	# 					    lr=LearnRate, 
-	# 						n_iter=Epochs, 
-	# 						batch_size=100, 
-	# 						NormalizationApproxIter=EMFIter,
-	# 		             	weight_decay="l2",decay_magnitude=0.01,
-	# 		             	# validation=ValidSet,
-	# 		             	monitor_every=MonitorEvery,
-	# 		             	monitor_vis=true,
-	# 		             	approx="tap2",
-	# 		            	persistent_start=EMFPersistStart)
-
-	finaldbm = pre_fit(dbm,TrainSet;persistent=true, 
-				lr=LearnRate, 
-				n_iter=Epochs, 
-				batch_size=100, 
-				Normaliz tionApproxIter=EMFIter,
+	finalrbm,monitor = fit_doubled(rbm1,TrainSet,"input";persistent=true, 
+						    lr=LearnRate, 
+							n_iter=Epochs, 
+							batch_size=100, 
+							NormalizationApproxIter=EMFIter,
 			             	weight_decay="l2",decay_magnitude=0.01,
-			             	validation=[],
+			             	# validation=ValidSet,
 			             	monitor_every=MonitorEvery,
 			             	monitor_vis=true,
-			             	approx="tap2",
+			             	approx=approx,
 			            	persistent_start=EMFPersistStart)
+
+	# prefit_dbm = pre_fit(dbm, TrainSet;persistent=true, 
+	# 			lr=LearnRate, 
+	# 			n_iter=Epochs, 
+	# 			batch_size=100, 
+	# 			NormalizationApproxIter=EMFIter,
+	# 		           weight_decay="l2",decay_magnitude=0.01,
+	# 		           validation=[],
+	# 		           monitor_every=MonitorEvery,
+	# 		           monitor_vis=true,
+	# 		           approx="tap2",
+	# 		           persistent_start=EMFPersistStart)
 
 	# mhid2=ProbHidAtLayerCondOnVis(dbm,X,2)
 	# println(size(mhid2)) 
 	# mhid1=ProbHidCondOnNeighbors(dbm[1],X,dbm[2],mhid2)
 	# println(size(mhid1))
 	# println(mhid1)  
-	# finaldbm,monitor = fit(dbm, TrainSet; persistent=true, 
-	# 					    lr=LearnRate, 
-	# 						n_iter=Epochs, 
-	# 						batch_size=100, 
-	# 						NormalizationApproxIter=EMFIter,
-	# 		             	weight_decay="l2",decay_magnitude=0.01,
-	# 		             	validation=ValidSet,
-	# 		             	monitor_every=MonitorEvery,
-	# 		             	monitor_vis=true,
-	# 		             	approx="tap2",
-	# 		            	persistent_start=EMFPersistStart)
-	# WriteMonitorChartPDF(finaldbm,monitor,X,"testmonitor_dbm_tap2.pdf")
- #    SaveMonitorHDF5(monitor,"testmonitor_dbm_tap2.h5")
+	finaldbm,monitor = fit(dbm, TrainSet; persistent=true, 
+					lr=LearnRate, 
+					n_iter=Epochs, 
+					batch_size=100, 
+					NormalizationApproxIter=EMFIter,
+			             	weight_decay="l2",decay_magnitude=0.01,
+			             	validation=ValidSet,
+			             	monitor_every=MonitorEvery,
+			             	monitor_vis=true,
+			             	approx="tap2",
+			            	persistent_start=EMFPersistStart)
+	WriteMonitorChartPDF(finaldbm,monitor,X,"testmonitor_dbm_tap2.pdf")
+    	SaveMonitorHDF5(monitor,"testmonitor_dbm_tap2.h5")
 
 end
 
