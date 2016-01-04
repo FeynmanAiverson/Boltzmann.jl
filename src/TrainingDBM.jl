@@ -18,21 +18,22 @@ function get_negative_samples(dbm::DBM, vis_init::Mat{Float64}, array_hid_init::
     if approx=="CD" 
         # In the case of Gibbs/MCMC sampling, we will take the binary visible samples as the negative
         # visible samples, and the expectation (means) for the negative hidden samples.
-        # v_neg, _, _, h_neg = MCMC(rbm, hid_init; iterations=iterations, StartMode="hidden") ## TODO : implement MCMC for DBM
+        v_neg, array_h_neg, _, _=MCMC(dbm, vis_init, array_hid_init; iterations=iterations, StartMode="visible")
     end
 
     return v_neg, array_h_neg
 end
 
+#### Unlike for RBMs, the computations of positive samples is not straightforward for DBMs and requires an equilibration. This function only exists for DBMs.
 function get_positive_samples(dbm::DBM, vis::Mat{Float64}, array_hid_init::Array{Array{Float64},1},approx::AbstractString, iterations::Int)
     if approx=="naive" || contains(approx,"tap")
         v_pos, array_h_pos = clamped_equilibrate(dbm,vis,array_hid_init; iterations=iterations, approx=approx)
     end
 
-    if approx=="CD" ##TODO
+    if approx=="CD" 
         # In the case of Gibbs/MCMC sampling, we will take the binary visible samples as the negative
         # visible samples, and the expectation (means) for the negative hidden samples.
-        # v_neg, _, _, h_neg = MCMC(rbm, hid_init; iterations=iterations, StartMode="hidden") ## TODO : implement MCMC for DBM
+        v_pos, array_h_pos, _, _=MCMC_clamped(dbm, vis, array_hid_init; iterations=iterations, StartMode="visible") 
     end
 
     return v_pos, array_h_pos
@@ -43,32 +44,19 @@ function fit_batch!(dbm::DBM, vis::Mat{Float64};
                     weight_decay="none",decay_magnitude=0.01, approx="CD")
     depth = length(dbm)
 
-    if approx=="naive" || contains(approx,"tap")
-        array_h_pos_init = ProbHidInitCondOnVis(dbm, vis)
-        v_pos, array_h_pos = get_positive_samples(dbm, vis, array_h_pos_init, approx, NormalizationApproxIter)
-        
-        if persistent # Set starting points in the case of persistence
-            v_init = copy(dbm[1].persistent_chain_vis)  
-            array_hid_init = Array(Array{Float64}, depth) 
-            for l=1:depth  
-                array_hid_init[l] = copy(dbm[l].persistent_chain_hid)
-            end
-        else
-            v_init = vis
-            array_hid_init = array_h_pos
-    end  
-    ## TODO : fix the contrastive divergence procedure      
-    # elseif approx=="CD" 
-    #     if persistent # Set starting points in the case of persistence
-    #         v_pos = vis
-    #         h_samples, h_pos = sample_hiddens(rbm,v_pos)
-    #         v_init = vis               # A dummy setting
-    #         h_init,_ = sample_hiddens(rbm,rbm.persistent_chain_vis)
-    #     else
-    #         v_init = vis               # A dummy setting
-    #         h_init = h_samples
-    #     end
-    end        
+    array_h_pos_init = ProbHidInitCondOnVis(dbm, vis)
+    v_pos, array_h_pos = get_positive_samples(dbm, vis, array_h_pos_init, approx, NormalizationApproxIter)
+
+    if persistent # Set starting points in the case of persistence
+        v_init = copy(dbm[1].persistent_chain_vis)  
+        array_hid_init = Array(Array{Float64}, depth) 
+        for l=1:depth  
+            array_hid_init[l] = copy(dbm[l].persistent_chain_hid)
+        end
+    else
+        v_init = vis
+        array_hid_init = array_h_pos
+    end    
 
     # Calculate the negative samples according to the desired approximation mode
     v_neg, array_h_neg = get_negative_samples(dbm,v_init,array_hid_init,approx,NormalizationApproxIter)
@@ -81,7 +69,7 @@ function fit_batch!(dbm::DBM, vis::Mat{Float64};
         end
     end
 
-    # Update on weights abd biases
+    # Update on weights and biases
     # Start with the first RBM
     rbm=dbm[1]
     h_pos=array_h_pos[1]

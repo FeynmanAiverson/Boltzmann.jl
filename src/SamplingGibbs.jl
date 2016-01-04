@@ -7,7 +7,6 @@ function sample(::Type{Bernoulli}, means::Mat{Float64})
     @simd for i=1:length(means)
         @inbounds s[i] = r[i] < means[i] ? 1.0 : 0.0
     end
-
     return s
 end
 
@@ -25,7 +24,7 @@ function sample_hiddens{V,H}(rbm::RBM{V,H}, vis::Mat{Float64})
     return sample(H, means), means
 end
 
-function sample_hiddens{V,H}(rbm1::RBM, vis::Mat{Float64}, rbm2::RBM, hid2::Mat{Float64})
+function sample_hiddens{V,H}(rbm1::RBM{V,H}, vis::Mat{Float64}, rbm2::RBM{V,H}, hid2::Mat{Float64})
     means =  ProbHidCondOnNeighbors(rbm1, vis, rbm2, hid2)
     return sample(H, means), means
 end
@@ -80,11 +79,11 @@ function MCMC(rbm::RBM, init::Mat{Float64}; iterations=1, StartMode="visible")
 end
 
 function MCMC(dbm::DBM, vis_init::Array{Float64}, array_hid_init::Array{Array{Float64},1}; iterations=1, StartMode="visible")    
-    depth=length(dbm)
-    vis = copy(vis_init)
+   depth=length(dbm)
+   vis = copy(vis_init)
+   vis_means = vis
    array_hid = copy(array_hid_init)
    array_hid_means = copy(array_hid_init)
-
    # Take the desired number of steps
    for i=1:iterations
       # update vis and even hidden layers
@@ -96,7 +95,6 @@ function MCMC(dbm::DBM, vis_init::Array{Float64}, array_hid_init::Array{Array{Fl
          k=depth
          array_hid[k], array_hid_means[k] =sample_hiddens(dbm[k],array_hid[k-1])
       end
-
       # update odd hidden layers 
       array_hid[1],array_hid_means[1] = sample_hiddens(dbm[1], vis, dbm[2], array_hid[2]) 
       for k=3:2:depth-1
@@ -107,12 +105,12 @@ function MCMC(dbm::DBM, vis_init::Array{Float64}, array_hid_init::Array{Array{Fl
          array_hid[k], array_hid_means[k] = sample_hiddens(dbm[k],array_hid[k-1])
       end
    end
-
-    return vis, array_hid, vis_means, array_hid_means
+   return vis, array_hid, vis_means, array_hid_means
 end
 
 function MCMC_clamped(dbm::DBM, vis::Array{Float64}, array_hid_init::Array{Array{Float64},1}; iterations=1, StartMode="visible")    
    depth=length(dbm)
+   vis_means = vis # A dummy definition as the visible values are clamped
    array_hid = copy(array_hid_init)
    array_hid_means = copy(array_hid_init)
 
