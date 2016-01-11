@@ -8,12 +8,12 @@ using Base.Test
 function run_mnist()
     X, y = testdata()  # test data is smaller, no need to downsample
     normalize_samples!(X)
-    binarize!(X;threhold=0.01)
+    binarize!(X;threshold=0.01)
 
     TrainSet = X[:,1:9000]
     ValidSet = X[:,9001:end]
     HiddenUnits = 100;
-    Epochs = 20;
+    Epochs = 10;
     Gibbs = 1;
     LearnRate = 0.05
     MonitorEvery=1
@@ -26,11 +26,16 @@ function run_mnist()
                           decay_magnitude=0.001,
                           lr=LearnRate,
                           validation=ValidSet,
-                          n_gibbs=Gibbs,
+                          NormalizationApproxIter=Gibbs,
                           monitor_every=MonitorEvery,
                           monitor_vis=true)
+    
+    info("==========monitor==============")
+    println(monitor)
+    info("===============================")
 
-    SaveMonitor(finalrbm,monitor,"testmonitor.pdf")
+    WriteMonitorChartPDF(finalrbm,monitor,X,"testmonitor.pdf")
+    SaveMonitorHDF5(monitor,"testmonitor.h5")
 end
 
 run_mnist()
