@@ -18,7 +18,7 @@ function run_mnist()
 	HiddenUnits1 = 500
 	HiddenUnits2 = 100
 	HiddenUnits3 = 10
-	approx="tap3"
+	approx="mixed"
 
 	rbm1 = BernoulliRBM(28*28, 			HiddenUnits1, (28,28); momentum=0., TrainData=TrainSet, sigma = 0.01)
 	rbm2 = BernoulliRBM(HiddenUnits1, 	HiddenUnits2, (HiddenUnits1,1); momentum=0., sigma = 0.01)
@@ -73,7 +73,7 @@ function run_mnist()
 			             	validation=ValidSet,
 			             	monitor_every=MonitorEvery,
 			             	monitor_vis=true,
-			             	approx="CD",
+			             	approx=approx,
 			            	persistent_start=EMFPersistStart)
 	WriteMonitorChartPDF(finaldbm,monitor,X,"testmonitor_dbm_tap2.pdf")
     SaveMonitorHDF5(monitor,"testmonitor_dbm_tap2.h5")

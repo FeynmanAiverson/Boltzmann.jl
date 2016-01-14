@@ -14,8 +14,7 @@ function get_negative_samples(dbm::DBM, vis_init::Mat{Float64}, array_hid_init::
     if approx=="naive" || contains(approx,"tap")
         v_neg, array_h_neg = equilibrate(dbm,vis_init,array_hid_init; iterations=iterations, approx=approx)
     end
-
-    if approx=="CD" 
+    if approx=="CD" || approx=="mixed"
         # In the case of Gibbs/MCMC sampling, we will take the binary visible samples as the negative
         # visible samples, and the expectation (means) for the negative hidden samples.
         v_neg, array_h_neg, _, _=MCMC(dbm, vis_init, array_hid_init; iterations=iterations, StartMode="visible")
@@ -28,6 +27,10 @@ end
 function get_positive_samples(dbm::DBM, vis::Mat{Float64}, array_hid_init::Array{Array{Float64},1},approx::AbstractString, iterations::Int)
     if approx=="naive" || contains(approx,"tap")
         v_pos, array_h_pos = clamped_equilibrate(dbm,vis,array_hid_init; iterations=iterations, approx=approx)
+    end
+
+    if approx=="mixed"
+        v_pos, array_h_pos = clamped_equilibrate(dbm,vis,array_hid_init; iterations=iterations, approx="naive")
     end
 
     if approx=="CD" 
@@ -410,6 +413,8 @@ function pre_fit(dbm::DBM, X::Mat{Float64};
              persistent_start=1)
 
     depth = length(dbm)
+    # if using the training method introduced by Salakhutdinov&Hinton mixing CD and MF, pretraining should be done using CD.
+    approx = approx == "mixed" ? "CD" : approx
 
     rbm, _ = fit_doubled(dbm[1], X, "input";
              persistent=persistent, lr=lr, n_iter=n_iter, batch_size=batch_size, NormalizationApproxIter=NormalizationApproxIter,
