@@ -317,7 +317,7 @@ function fit_doubled(rbm,X::Mat{Float64}, which::AbstractString;
     # Create the historical monitor
     ProgressMonitor = Monitor(n_iter,monitor_every;monitor_vis=monitor_vis,
                                                    validation=flag_use_validation)
-    ProgressMonitor.FigureHandle=plt.figure("DBM";figsize=(12,15))
+    # ProgressMonitor.FigureHandle=plt.figure("DBM";figsize=(12,15))
 
     # Print info to user
     m_ = rbmaux.momentum

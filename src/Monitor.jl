@@ -108,7 +108,6 @@ function UpdateMonitor!(dbm::DBM,mon::Monitor,dataset::Mat{Float64},itr::Int;val
     N = nh + nv
     nsamps = min(size(dataset,2),5000)      # Set maximum number of samples to test as 5000
 
-
     if itr%mon.MonitorEvery==0
         if mon.UseValidation 
             vpl = mean(score_samples(dbm, validation))/N

@@ -129,7 +129,6 @@ function figure_refresh(figureHandle)
     plt.pause(0.0001)
 end
 
-
 function WriteMonitorChartPDF(rbm::RBM,mon::Monitor,X::Mat{Float64},filename::AbstractString)
     savefig = plt.figure(5;figsize=(12,15))
     # Show Per-Epoch Progres
