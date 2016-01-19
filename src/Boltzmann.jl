@@ -10,6 +10,8 @@ export RBM,
        DAE,
        DBM,
        fit,
+       fit_doubled,
+       pre_fit,
        transform,
        generate,
        components,
@@ -38,14 +40,15 @@ export RBM,
        chart_likelihood_evolution,
        ProbHidAtLayerCondOnVis,
        ProbHidCondOnNeighbors,
+       ProbHidInitCondOnVis,
+       mag_vis_tap2,
+       mag_hid_tap2,
        get_positive_samples,
        get_negative_samples,
-       ProbHidInitCondOnVis,
        free_energy,
        score_samples_TAP,
-       score_samples,
-       fit_doubled,
-       pre_fit
+       score_samples
+       
 
 include("core.jl")
 

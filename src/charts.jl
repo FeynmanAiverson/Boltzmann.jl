@@ -159,9 +159,6 @@ function WriteMonitorChartPDF(rbm::RBM,mon::Monitor,X::Mat{Float64},filename::Ab
     plt.close()
 end
 
-
-
-
 function ShowMonitor(rbm::RBM,mon::Monitor,X::Mat{Float64},itr::Int;filename=[])
     fig = mon.FigureHandle
 
