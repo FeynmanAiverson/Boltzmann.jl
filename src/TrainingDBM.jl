@@ -67,8 +67,10 @@ function fit_batch!(dbm::DBM, vis::Mat{Float64};
     # If we are in persistent mode, update the chain accordingly
     if persistent
         copy!(dbm[1].persistent_chain_vis,v_neg)
-        for l=1:depth  
-            copy!(dbm[l].persistent_chain_hid,array_h_neg[l])
+        copy!(dbm[1].persistent_chain_hid,array_h_neg[1])
+        for l=2:depth  
+              copy!(dbm[l].persistent_chain_vis,array_h_neg[l-1])
+              copy!(dbm[l].persistent_chain_hid,array_h_neg[l])
         end
     end
 

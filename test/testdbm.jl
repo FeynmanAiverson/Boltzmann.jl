@@ -7,9 +7,9 @@ function run_mnist()
 	binarize!(X;threshold=0.01)
 
 	# X=X[:,1:10000]
-	TrainSet = X[:,1:10000]
+	TrainSet = X[:,1:1000]
 	ValidSet = X[:,59001:60000]
-	Epochs = 3;
+	Epochs = 1;
 	MCMCIter = 1;
 	EMFIter = 3
 	LearnRate = 0.005
