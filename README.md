@@ -6,15 +6,13 @@ Boltzmann.jl
 
 Restricted Boltzmann machines and deep belief networks in Julia.
 This particular package is a fork of [dfdx/Boltzmann.jl](https://github.com/dfdx/Boltzmann.jl) 
-with modificaitons made by the SPHINX Team @ ENS Paris.
+with modifications made by the SPHINX Team @ ENS Paris.
 
 
 Installation
 ------------
-Currently, this package is unregistered with the Julia package manager. Once the modifications
-here are feature complete, we can either make the fork permanent or request a merge back into
-the [dfdx/Boltzmann.jl](https://github.com/dfdx/Boltzmann.jl) package. For now, installation
-should be accomplished via:
+Currently, this package is unregistered with the Julia package manager. 
+Once the modifications here are feature complete, we can either make the fork permanent or request a merge back into the [dfdx/Boltzmann.jl](https://github.com/dfdx/Boltzmann.jl) package. For now, installation should be accomplished via:
 
 ```julia
     Pkg.clone("https://github.com/sphinxteam/Boltzmann.jl")
@@ -23,91 +21,91 @@ should be accomplished via:
 RBM Basic Usage
 ---------------
 
-Train RBM:
+Below, we show a basic script to train a binary RBM on random training data. For this example, persistent contrastive divergence with one step on the MCMC sampling chain (PCD-1) is used. Finally, we also point out the monitoring and charting functionality which is passed as an optional argument to the `fit` procedure.
 
 ```julia
     using Boltzmann
 
-    X = randn(100, 2000)    # 2000 observations (examples) 
-                            #  with 100 variables (features) each
-    X = (X + abs(minimum(X))) / (maximum(X) - minimum(X)) # scale X to [0..1]
-    rbm = GRBM(100, 50)     # define Gaussian RBM with 100 visible (input) 
-                            #  and 50 hidden (output) variables
-    fit(rbm, X)             # fit model to data 
+    # Experimental parameters for this smoke test
+    NFeatures    = 100
+    FeatureShape = (10,10)
+    NSamples     = 2000
+    NHidden      = 50
+
+    # Generate a random test set in [0,1]
+    X = rand(NFeatures, NSamples)    
+    binarize!(X;threshold=0.5)                        
+
+    # Initialize the RBM Model
+    rbm = BernoulliRBM(NFeatures, NHidden, FeatureShape)
+
+    # Run CD-1 Training with persistence
+    rbm = fit(rbm,X; n_iter        = 30,      # Training Epochs
+                     batch_size    = 50,      # Samples per minibatch
+                     persistent    = true,    # Use persistent chains
+                     approx        = "CD",    # Use CD (MCMC) Sampling
+                     monitor_every = 1,       # Epochs between scoring
+                     monitor_vis   = true)    # Show live charts
 ```
 
-(for more meaningful dataset see [MNIST Example](https://github.com/dfdx/Boltzmann.jl/blob/master/examples/mnistexample.jl))
+Extended Mean-Field (EMF) Approximation
+---------------------------------------
 
-After model is fitted, you can **extract learned components** (a.k.a. weights): 
+Besides the use of the sampling-based default CD RBM training, we have also implemented the extended mean-field approach of
+
+> M. Gabrié, E. W. Tramel, F. Krzakala, ``Training restricted Boltzmann machines via the Thouless-Andreson-Palmer free energy,'' in Proc. Conf. on Neural Info. Processing Sys. (NIPS), Montreal, Canada, June 2015.
+
+In this approach, rather than using MCMC to produce a number of independent samples used to collect the statistics in the negative training phase, 1st, 2nd, and 3rd order mean-field approximations are used to estimate equilibrium magnetizations on both the visible and hidden units. These real-valued magnetizations are then used in lieu of binary particles.
 
 ```julia
-    comps = components(rbm)
+    ApproxIter = 3      # How many fixed-point EMF steps to take
+
+    # ...etc...
+
+    # Train using 1st order mean-field (naïve mean field)
+    fit(rbm1,TrainData; approx="naive", NormalizationApproxIter=ApproxIter)
+
+    # Train using 2nd order mean-field
+    fit(rbm2,TrainData; approx="tap2", NormalizationApproxIter=ApproxIter)
+
+    # Train using 3rd order mean-field
+    fit(rbm3,TrainData; approx="tap3", NormalizationApproxIter=ApproxIter)
 ```
 
-**transform** data vectors into new higher-level representation (e.g. for further classification): 
+MNIST Example
+-------------
+
+One can find the script for this example inside the `/examples` directory [of the repository](https://github.com/sphinxteam/Boltzmann.jl/blob/master/examples/mnistexample.jl).
+
+Sampling
+--------
+
+After training an RBM, one can generate samples from the distribution it has been trained to model. To start the sampling chain, one needs to provide an initialization to the visible layer. This can be either a sample from the training set or some random initialization, depending on the task to be accomplished. Below we see a short script to accomplish this sampling. 
 
 ```julia
-    Xt = transform(rbm, X)  # vectors of X have length 100, vectors of Xt - length 50
+# Experimental Parameters
+    NFeatures = 100
+
+    # Generate a random binary initialization
+    vis_init = rand(NFeatures,1)
+    binarize!(vis_init;threshold=0.5)
+
+    # Obtain the number of desired samples
+    vis_samples = generate(rbm,       # Trained RBM Model to sample from
+                           vis_init,   # Starting point for sampling chain
+                           "CD",       # Sampling method, here, MCMC/Gibbs
+                           100)        # Number of steps to take on sampling chain
 ```
 
-or **generate** vectors similar to given ones (e.g. for recommendation, see example [here](https://github.com/dfdx/lastfm-rbm))
 
-```julia
-    x = ... 
-    x_new = generate(rbm, x)
-```
+RBM Variants
+------------
 
-RBMs can handle both - dense and sparse arrays. It cannot, however, handle DataArrays because it's up to application how to treat missing values.
+Currently, this version of the Boltzmann package only provides support for the following RBM variants:
 
+ - `BernoulliRBM`: RBM with binary visible and hidden units.
 
-RBM Kinds
----------
-
-This package provides implementation of the 2 most popular kinds of restricted Boltzmann machines: 
-
- - `BernoulliRBM`: RBM with binary visible and hidden units
- - `GRBM`: RBM with Gaussian visible and binary hidden units
-
-Bernoulli RBM is classic one and works great for modeling binary (e.g. like/dislike) and nearly binary (e.g. logistic-based) data. Gaussian RBM works better when visible variables approximately follow normal distribution, which is often the case e.g. for image data. 
-
-
-Deep Belief Networks
---------------------
-
-DBNs are created as a stack of named RBMs. Below is an example of training DBN for MNIST dataset:
-
-```julia
-    using Boltzmann
-    using MNIST
-
-    X, y = traindata()
-    X = X[:, 1:1000]                     # take only 1000 observations for speed
-    X = X / (maximum(X) - (minimum(X)))  # normalize to [0..1]
-
-    layers = [("vis", GRBM(784, 256)),
-              ("hid1", BernoulliRBM(256, 100)),
-              ("hid2", BernoulliRBM(100, 100))]
-    dbn = DBN(layers)
-    fit(dbn, X)
-    transform(dbn, X)
-```
-
-Deep Autoencoders
------------------
-
-Once built, DBN can be converted into a deep autoencoder. Continuing previous example:
-
-```julia
-    dae = unroll(dbn)
-```
-DAEs cannot be trained directly, but can be used to transform input data:
-
-```julia
-    transform(dae, X)
-```
-
-In this case output will have the same dimensionality as input, but with a noise removed.
-
+Support for real valued visibile units is still in progress. Some basic functionality for this feature was provided in limited, though unverified way, in the [upstream repository of this fork](https://https://github.com/dfdx/Boltzmann.jl). We suggest waiting until a verified implementation of the G-RBM is provided, here.
 
 Integration with Mocha
 ----------------------
