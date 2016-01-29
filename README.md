@@ -107,6 +107,10 @@ Currently, this version of the Boltzmann package only provides support for the f
 
 Support for real valued visibile units is still in progress. Some basic functionality for this feature was provided in limited, though unverified way, in the [upstream repository of this fork](https://https://github.com/dfdx/Boltzmann.jl). We suggest waiting until a verified implementation of the G-RBM is provided, here.
 
+Deep Boltzmann Machines
+-----------------
+
+
 Integration with Mocha
 ----------------------
 
