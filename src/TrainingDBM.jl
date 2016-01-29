@@ -209,7 +209,9 @@ function fit(dbm::DBM, X::Mat{Float64};
     # Random initialization of the persistent chains
     dbm[1].persistent_chain_vis,_ = random_columns(X,batch_size)
     array_persistent_chain_hid = ProbHidInitCondOnVis(dbm,dbm[1].persistent_chain_vis)
-    for l=1:depth  
+    dbm[1].persistent_chain_hid = copy(array_persistent_chain_hid[1])
+    for l=2:depth
+        dbm[l].persistent_chain_vis = copy(array_persistent_chain_hid[l-1])  
         dbm[l].persistent_chain_hid = copy(array_persistent_chain_hid[l])
     end
 
