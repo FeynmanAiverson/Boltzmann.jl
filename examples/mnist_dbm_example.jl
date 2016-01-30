@@ -3,16 +3,16 @@ using MNIST
 
 function run_mnist()
 	# Set training parameters
-	PretrainingEpochs = 2
-	Epochs = 3
-	Approx = "tap2"
-	ApproxSteps = 3
-	LearnRate = 0.005
-	MonitorEvery = 2
-	PersistStart = 5
-	Momentum = 0.5
-	DecayMagnitude = 0.01
-	DecayType = "l2"
+	PretrainingEpochs 	= 2
+	Epochs 			= 3
+	Approx 			= "tap2"
+	ApproxSteps 		= 3
+	LearnRate	 	= 0.005
+	MonitorEvery 		= 2
+	PersistStart 		= 5
+	Momentum 		= 0.5
+	DecayMagnitude 	= 0.01
+	DecayType 		= "l2"
 	
 	# Load MNIST Training data
 	X, y = traindata() # Raw data and labels
@@ -24,7 +24,7 @@ function run_mnist()
 	
 	# Initialize Model
 	HiddenUnits1 = 500
-	HiddenUnits2 = 1000d
+	HiddenUnits2 = 1000
 	rbm1 = BernoulliRBM(28*28, 		HiddenUnits1, (28,28); 			momentum=0., TrainData=TrainSet, sigma = 0.01)
 	rbm2 = BernoulliRBM(HiddenUnits1, 	HiddenUnits2, (HiddenUnits1,1); 	momentum=0., sigma = 0.01)
     	layers = [("vishid1",  rbm1),
@@ -33,31 +33,31 @@ function run_mnist()
 
 	# Run pretraining of the model in a greedy layer-wise fashion. This step is optional.
 	prefit_dbm = pre_fit(dbm, TrainSet;
-				persistent=true, 
-				lr=LearnRate, 
-				n_iter=PretrainingEpochs, 
-				batch_size=100, 
+				persistent 		= true, 
+				lr 			= LearnRate, 
+				n_iter 			= PretrainingEpochs, 
+				batch_size 		= 100, 
 				NormalizationApproxIter=ApproxSteps,
-			        	weight_decay="DecayType",decay_magnitude=DecayType,
-			        	validation=[],
-			        	monitor_every=MonitorEvery,
-			        	monitor_vis=true,
-			        	approx=Approx,
-			        	persistent_start=PersistStart)
+			        	weight_decay		= DecayType, decay_magnitude = DecayMagnitude,
+			        	validation		= [],
+			        	monitor_every		= MonitorEvery,
+			        	monitor_vis		= true,
+			        	approx 			= Approx,
+			        	persistent_start	= PersistStart)
 
 	# Run joint training of all the layers of the DBM
 	finaldbm,monitor = fit(prefit_dbm, TrainSet; 
-				persistent=false, 
-				lr=LearnRate, 
-				n_iter=Epochs, 
-				batch_size=100, 
-				NormalizationApproxIter=ApproxSteps,
-		             		weight_decay="l2",decay_magnitude=0.01,
-		             		validation=ValidSet,
-		             		monitor_every=MonitorEvery,
-		             		monitor_vis=true,
-		             		approx=Approx,
-		            		persistent_start=PersistStart)
+				persistent 		= true, 
+				lr 			= LearnRate, 
+				n_iter 			= Epochs, 
+				batch_size 		= 100, 
+				NormalizationApproxIter = ApproxSteps,
+		             		weight_decay 		= DecayType, decay_magnitude = DecayMagnitude ,
+		             		validation		= ValidSet,
+		             		monitor_every		= MonitorEvery,
+		             		monitor_vis		= true,
+		             		approx 			=Approx,
+		            		persistent_start	=PersistStart)
 
 	# Save plotted charts and raw data monitoring the joint training 
 	WriteMonitorChartPDF(finaldbm,monitor,X,"example_dbm_monitor_charts.pdf")
