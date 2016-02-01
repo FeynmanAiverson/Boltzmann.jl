@@ -94,7 +94,7 @@ function free_energy(dbm::DBM, vis::Mat{Float64}; n_iter=5)
     fe = U_naive + Onsager - S
 end
 
-function score_samples(dbm::DBM, vis::Mat{Float64}; sample_size=10000, n_iter=5)
+function score_samples(dbm::DBM, vis::Mat{Float64}; sample_size=10000, n_iter=10)
     if issparse(vis)
         # sparse matrices may be infeasible for this operation
         # so using only little sample
@@ -112,7 +112,7 @@ function score_samples(dbm::DBM, vis::Mat{Float64}; sample_size=10000, n_iter=5)
     return n_feat * log(logsig(fe_corrupted - fe))
 end
 
-function score_samples_TAP(dbm::DBM, vis::Mat{Float64}; n_iter=5)
+function score_samples_TAP(dbm::DBM, vis::Mat{Float64}; n_iter=10)
 
     depth=length(dbm)
     array_h_init = ProbHidInitCondOnVis(dbm, vis)
