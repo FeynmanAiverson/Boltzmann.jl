@@ -120,7 +120,7 @@ function plot_weightdist(rbm::RBM)
     plt.hist(vec(rbm.W);bins=100)
     plt.title("Weight Distribution")
     plt.xlabel("Weight Value")
-    plt.ylabel("Frequeny")
+    plt.ylabel("Frequency")
 end
 
 function figure_refresh(figureHandle)
