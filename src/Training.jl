@@ -149,7 +149,7 @@ end
     ## Function Call
         `fit(rbm::RBM, X::Mat{Float64}[, persistent, lr, batch_size, NormalizationApproxIter, weight_decay, 
                                          decay_magnitude, validation,monitor_ever, monitor_vis,
-                                         approx, persistent_start])`
+                                         approx, persistent_start, save_params])`
     ## Description
     The core RBM training function. Learns the weights and biasings using 
     either standard Contrastive Divergence (CD) or Persistent CD, depending on
@@ -178,6 +178,17 @@ end
      - *score_every:* Controls at which epoch the progress of the fit is monitored. Useful to 
                       speed up the fit procedure if detailed progress monitoring is not required.
                       [default=5]
+     - *save_progress:* Controls the saving of RBM parameters throughout the course of the training.
+                     Should be passed as a tuple in the following manner:
+                        (::AbstractString,::Int)                      
+                     where the first field is the filename for the HDF5 used to save results and
+                     the second field specifies how often to write the parameters to disk. All
+                     results will be stored in the specified HDF5 file under the root headings
+                        `Epochxxxx___weight`
+                        `Epochxxxx___vbias`
+                        `Epochxxxx___bias`
+                     where `xxxx` specifies the epoch number in the `%04d` format.   
+                     [default=nothing]    
 
     ## Returns
      - *::RBM* -- A trained RBM model.
@@ -188,7 +199,7 @@ function fit(rbm::RBM, X::Mat{Float64};
              persistent=true, lr=0.1, n_iter=10, batch_size=100, NormalizationApproxIter=1,
              weight_decay="none",decay_magnitude=0.01,validation=[],
              monitor_every=5,monitor_vis=false, approx="CD",
-             persistent_start=1)
+             persistent_start=1, save_progress=nothing)
 
     # TODO: This line needs to be changed to accomodate real-valued units
     @assert minimum(X) >= 0 && maximum(X) <= 1
@@ -263,6 +274,20 @@ function fit(rbm::RBM, X::Mat{Float64};
         
         UpdateMonitor!(rbm,ProgressMonitor,X,itr;bt=walltime_µs,validation=validation,lr=lr,mo=rbm.momentum)
         ShowMonitor(rbm,ProgressMonitor,X,itr)
+
+        # Attempt to save parameters if need be
+        if save_progress != nothing 
+            if itr%save_progress[2]==0
+                rootName = @sprintf("Epoch%04d",itr)
+                if isfile(save_progress[1])
+                    info("Appending Params...")
+                    append_params(save_progress[1],rbm,rootName)
+                else
+                    info("Creating file and saving params...")
+                    save_params(save_progress[1],rbm,rootName)
+                end
+            end
+        end
     end
 
     return rbm, ProgressMonitor
