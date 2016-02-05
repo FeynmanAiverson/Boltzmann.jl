@@ -138,19 +138,19 @@ dbm = DBM(layers)
 
 # Run pretraining of successive RBM layers, return DBM model 
 pretrained_dbm = pre_fit(dbm, X;   
-                                n_iter        = 3,      # Pretraining Epochs
-                                batch_size    = 50,      # Samples per minibatch
-                                persistent    = true,    # Use persistent chains
-                                monitor_every = 1,       # Epochs between scoring
-                                monitor_vis   = true)    # Show live charts
+                    n_iter        = 3,      # Pretraining Epochs
+                    batch_size    = 50,      # Samples per minibatch
+                    persistent    = true,    # Use persistent chains
+                    monitor_every = 1,       # Epochs between scoring
+                    monitor_vis   = true)    # Show live charts
 
 # Run joint training of all DBM layers, return DBM model and monitoring dictionnary
 trained_dbm, monitor = fit(pretrained_dbm, X;
-                                n_iter        = 3,      # Pretraining Epochs
-                                batch_size    = 50,      # Samples per minibatch
-                                persistent    = true,    # Use persistent chains
-                                monitor_every = 1,       # Epochs between scoring
-                                monitor_vis   = true)    # Show live charts
+                    n_iter        = 3,      # Pretraining Epochs
+                    batch_size    = 50,      # Samples per minibatch
+                    persistent    = true,    # Use persistent chains
+                    monitor_every = 1,       # Epochs between scoring
+                    monitor_vis   = true)    # Show live charts
 ```
 
 Similarly to  RBMs, EMF approximations can also be used for DBMs.  
