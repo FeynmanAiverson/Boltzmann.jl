@@ -146,7 +146,7 @@ pretrained_dbm = pre_fit(dbm, X;
 
 # Run joint training of all DBM layers, return DBM model and monitoring dictionnary
 trained_dbm, monitor = fit(pretrained_dbm, X;
-                    n_iter        = 3,      # Pretraining Epochs
+                    n_iter        = 3,      # Joint training Epochs
                     batch_size    = 50,      # Samples per minibatch
                     persistent    = true,    # Use persistent chains
                     monitor_every = 1,       # Epochs between scoring
