@@ -111,9 +111,46 @@ Deep Boltzmann Machines
 -----------------
 
 The current version of the package offers the possibility to train DBM.
-The example below uses the training procedure originally prescribed by [R. Salakhutinov and G. Hinton](http://www.cs.toronto.edu/~rsalakhu/papers/dbm.pdf). In a first time, the DBM is greedily pretrained layerwise using the RBM training functions. In a second time, all the layers of the DBM are trained jointly using naive mean-field iterations in the positive phase and persistent MCMC sampling in the negative phase. 
+The example below uses the training procedure originally prescribed by [R. Salakhutinov and G. Hinton](http://www.cs.toronto.edu/~rsalakhu/papers/dbm.pdf). First, the DBM is greedily pretrained layerwise using the RBM training functions. Second, all the layers of the DBM are trained jointly using naive mean-field iterations in the positive phase and persistent MCMC sampling in the negative phase. 
 
+``` julia
+using Boltzmann
 
+# Experimental parameters for this smoke test
+NFeatures    = 100
+FeatureShape = (10,10)
+NSamples    = 2000
+NHidden1    = 50
+NHidden2    =  20
+
+# Generate a random test set in [0,1]
+X = rand(NFeatures, NSamples)    
+binarize!(X;threshold=0.5)                        
+
+# Initialize the DBM Model as a stack of RBM
+rbm1 = BernoulliRBM(NFeatures, NHidden1, FeatureShape)
+rbm2 = BernoulliRBM(NHidden1, NHidden2, (NHidden1,1))
+layers = [("vishid1",  rbm1),("hid1hid2", rbm2)]
+dbm = DBM(layers)
+
+# Run pretraining of successive RBM layers, return DBM model 
+pretrained_dbm = pre_fit(dbm, X;   
+                                                n_iter        = 3,      # Pretraining Epochs
+                                                batch_size    = 50,      # Samples per minibatch
+                                                persistent    = true,    # Use persistent chains
+                                                approx        = "mixed",    # Use CD (MCMC) sampling
+                                                monitor_every = 1,       # Epochs between scoring
+                                                monitor_vis   = true)    # Show live charts
+
+# Run joint training of all DBM layers, return DBM model and monitoring dictionnary
+trained_dbm, monitor = fit(pretrained_dbm, X;
+                                                n_iter        = 3,      # Pretraining Epochs
+                                                batch_size    = 50,      # Samples per minibatch
+                                                persistent    = true,    # Use persistent chains
+                                                approx        = "mixed",    # Use CD (MCMC) sampling (resp. naive MF iterations) for the negative (resp. positive) phase 
+                                                monitor_every = 1,       # Epochs between scoring
+                                                monitor_vis   = true)    # Show live charts
+```
 
 Integration with Mocha
 ----------------------
