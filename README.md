@@ -110,6 +110,10 @@ Support for real valued visibile units is still in progress. Some basic function
 Deep Boltzmann Machines
 -----------------
 
+The current version of the package offers the possibility to train DBM.
+The example below uses the training procedure originally prescribed by [R. Salakhutinov and G. Hinton](http://www.cs.toronto.edu/~rsalakhu/papers/dbm.pdf). In a first time, the DBM is greedily pretrained layerwise using the RBM training functions. In a second time, all the layers of the DBM are trained jointly using naive mean-field iterations in the positive phase and persistent MCMC sampling in the negative phase. 
+
+
 
 Integration with Mocha
 ----------------------
