@@ -111,7 +111,10 @@ Deep Boltzmann Machines
 -----------------
 
 The current version of the package offers the possibility to train DBM.
-The example below uses the training procedure originally prescribed by [R. Salakhutinov and G. Hinton](http://www.cs.toronto.edu/~rsalakhu/papers/dbm.pdf). First, the DBM is greedily pretrained layerwise using the RBM training functions. Second, all the layers of the DBM are trained jointly using naive mean-field iterations in the positive phase and persistent MCMC sampling in the negative phase. 
+
+The example below uses the training procedure originally prescribed by [R. Salakhutinov and G. Hinton](http://www.cs.toronto.edu/~rsalakhu/papers/dbm.pdf). 
+First, the DBM is greedily pretrained layerwise using the `prefit` function. 
+Second, all the layers of the DBM are trained jointly using naive mean-field iterations in the positive phase and persistent MCMC sampling in the negative phase by the `fit` function.
 
 ``` julia
 using Boltzmann
@@ -135,21 +138,33 @@ dbm = DBM(layers)
 
 # Run pretraining of successive RBM layers, return DBM model 
 pretrained_dbm = pre_fit(dbm, X;   
-                                                n_iter        = 3,      # Pretraining Epochs
-                                                batch_size    = 50,      # Samples per minibatch
-                                                persistent    = true,    # Use persistent chains
-                                                approx        = "mixed",    # Use CD (MCMC) sampling
-                                                monitor_every = 1,       # Epochs between scoring
-                                                monitor_vis   = true)    # Show live charts
+                                n_iter        = 3,      # Pretraining Epochs
+                                batch_size    = 50,      # Samples per minibatch
+                                persistent    = true,    # Use persistent chains
+                                monitor_every = 1,       # Epochs between scoring
+                                monitor_vis   = true)    # Show live charts
 
 # Run joint training of all DBM layers, return DBM model and monitoring dictionnary
 trained_dbm, monitor = fit(pretrained_dbm, X;
-                                                n_iter        = 3,      # Pretraining Epochs
-                                                batch_size    = 50,      # Samples per minibatch
-                                                persistent    = true,    # Use persistent chains
-                                                approx        = "mixed",    # Use CD (MCMC) sampling (resp. naive MF iterations) for the negative (resp. positive) phase 
-                                                monitor_every = 1,       # Epochs between scoring
-                                                monitor_vis   = true)    # Show live charts
+                                n_iter        = 3,      # Pretraining Epochs
+                                batch_size    = 50,      # Samples per minibatch
+                                persistent    = true,    # Use persistent chains
+                                monitor_every = 1,       # Epochs between scoring
+                                monitor_vis   = true)    # Show live charts
+```
+
+Similarly to  RBMs, EMF approximations can also be used for DBMs.  
+In the `fit` procedure for DBMs, the EMF approximation  passed as an argument is used to estimate gradients both in the negative and in the positive phase. 
+The syntax is unchanged from RBMs.
+
+```julia
+    ApproxIter = 3      # How many fixed-point EMF steps to take
+
+    # ...etc...
+
+    # Train using 2nd order mean-field
+    prefit(dbm, TrainData; approx="tap2", NormalizationApproxIter=ApproxIter) 
+    fit(rbm2,TrainData; approx="tap2", NormalizationApproxIter=ApproxIter)
 ```
 
 Integration with Mocha

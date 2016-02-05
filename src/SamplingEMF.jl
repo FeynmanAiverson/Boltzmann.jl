@@ -17,7 +17,7 @@ end
 
 mag_hid_naive(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64})=mag_hid_naive(rbm, m_vis) 
 
-## Defining a method for  intermediate hidden layers with top down feedback ##
+## DBM : Defining a method for  intermediate hidden layers with top down feedback ##
 function mag_hid_naive(rbm1::RBM, m_vis::Mat{Float64}, rbm2::RBM, m_hid2::Mat{Float64}) 
     buf = rbm1.hbias .+ gemm('N', 'N', rbm1.W, m_vis) .+ gemm('T', 'N', rbm2.W, m_hid2)   
     return logsig(buf)
@@ -26,6 +26,7 @@ end
 mag_hid_naive(rbm1::RBM, m_vis::Mat{Float64}, rbm2::RBM, 
                                 m_hid2::Mat{Float64}, m_hid1::Mat{Float64}) = mag_hid_naive(rbm1, m_vis, rbm2, m_hid2)
 
+## DBM : Defining a method for first hidden layer considering clamped visible units ##
 function mag_hid_clamped_naive(rbm1::RBM, vis::Mat{Float64}, rbm2::RBM, m_hid2::Mat{Float64})
     buf = rbm1.hbias .+ gemm('N', 'N', rbm1.W, vis) .+ gemm('T', 'N', rbm2.W, m_hid2)   
     return logsig(buf)
@@ -48,7 +49,7 @@ function mag_hid_tap2(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64})
     return logsig(buf)
 end
 
-## Defining a method for  intermediate hidden layers with top down feedback ##
+## DBM : Defining a method for  intermediate hidden layers with top down feedback ##
 function mag_hid_tap2(rbm1::RBM, m_vis::Mat{Float64}, rbm2::RBM, m_hid2::Mat{Float64}, m_hid1::Mat{Float64})
     buf = rbm1.hbias .+ gemm('N', 'N', rbm1.W, m_vis) .+ gemm('T', 'N', rbm2.W, m_hid2)   
     second_order = gemm('N', 'N', rbm1.W2, m_vis-abs2(m_vis)).*(0.5-m_hid1) .+ gemm('T', 'N', rbm2.W2, m_hid2-abs2(m_hid2)).*(0.5-m_hid1)
@@ -56,6 +57,7 @@ function mag_hid_tap2(rbm1::RBM, m_vis::Mat{Float64}, rbm2::RBM, m_hid2::Mat{Flo
     return logsig(buf)
 end
 
+## DBM : Defining a method for first hidden layer considering clamped visible units ##
 function mag_hid_clamped_tap2(rbm1::RBM, vis::Mat{Float64}, rbm2::RBM, m_hid2::Mat{Float64}, m_hid1::Mat{Float64})
     buf = rbm1.hbias .+ gemm('N', 'N', rbm1.W, vis) .+ gemm('T', 'N', rbm2.W, m_hid2)   
     second_order = gemm('T', 'N', rbm2.W2, m_hid2-abs2(m_hid2)).*(0.5-m_hid1)
@@ -82,7 +84,7 @@ function mag_hid_tap3(rbm::RBM, m_vis::Mat{Float64}, m_hid::Mat{Float64})
     return logsig(buf)
 end
 
-## Defining a method for  intermediate hidden layers with top down feedback ##
+## DBM : Defining a method for  intermediate hidden layers with top down feedback ##
 function mag_hid_tap3(rbm1::RBM, m_vis::Mat{Float64}, rbm2::RBM, m_hid2::Mat{Float64}, m_hid1::Mat{Float64})
     buf = rbm1.hbias .+ gemm('N', 'N', rbm1.W, m_vis) .+ gemm('T', 'N', rbm2.W, m_hid2)   
     second_order = gemm('N', 'N', rbm1.W2, m_vis-abs2(m_vis)).*(0.5-m_hid1) .+ gemm('T', 'N', rbm2.W2, m_hid2-abs2(m_hid2)).*(0.5-m_hid1)
@@ -92,6 +94,7 @@ function mag_hid_tap3(rbm1::RBM, m_vis::Mat{Float64}, rbm2::RBM, m_hid2::Mat{Flo
     return logsig(buf)
 end
 
+## DBM : Defining a method for first hidden layer considering clamped visible units ##
 function mag_hid_clamped_tap3(rbm1::RBM, vis::Mat{Float64}, rbm2::RBM, m_hid2::Mat{Float64}, m_hid1::Mat{Float64})
     buf = rbm1.hbias .+ gemm('N', 'N', rbm1.W, vis) .+ gemm('T', 'N', rbm2.W, m_hid2)   
     second_order = gemm('T', 'N', rbm2.W2, m_hid2-abs2(m_hid2)).*(0.5-m_hid1)

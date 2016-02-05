@@ -1,4 +1,4 @@
-
+### TO DO : deprecate the DBN method for fit as it could be in conflict with the DBM method.
 using Compat
 
 abstract Net

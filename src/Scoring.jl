@@ -54,7 +54,8 @@ function score_samples_TAP(rbm::RBM, vis::Mat{Float64}; n_iter=5)
 end 
 
 ################# DBM methods #####################################################################################
-
+## DBM : the computation of the clamped free requires an equilibration . ##
+## The following function calls on 'get_positive_sampling' ##
 function free_energy(dbm::DBM, vis::Mat{Float64}; n_iter=5)
     depth=length(dbm)
     array_h_pos_init = ProbHidInitCondOnVis(dbm, vis)
@@ -94,6 +95,7 @@ function free_energy(dbm::DBM, vis::Mat{Float64}; n_iter=5)
     fe = U_naive + Onsager - S
 end
 
+## DBM: the computation of the pseudo likelihood calls the clamped free energy twice, so two equilibrations ##
 function score_samples(dbm::DBM, vis::Mat{Float64}; sample_size=10000, n_iter=10)
     if issparse(vis)
         # sparse matrices may be infeasible for this operation
@@ -112,6 +114,7 @@ function score_samples(dbm::DBM, vis::Mat{Float64}; sample_size=10000, n_iter=10
     return n_feat * log(logsig(fe_corrupted - fe))
 end
 
+## DBM: equilibration calls 'get_negative_samples' ##
 function score_samples_TAP(dbm::DBM, vis::Mat{Float64}; n_iter=10)
 
     depth=length(dbm)

@@ -23,7 +23,8 @@ function get_negative_samples(dbm::DBM, vis_init::Mat{Float64}, array_hid_init::
     return v_neg, array_h_neg
 end
 
-#### Unlike for RBMs, the computations of positive samples is not straightforward for DBMs and requires an equilibration. This function only exists for DBMs.
+## DBM: Unlike for RBMs, the computations of positive samples is not straightforward for DBMs 
+## and requires an equilibration. 
 function get_positive_samples(dbm::DBM, vis::Mat{Float64}, array_hid_init::Array{Array{Float64},1},approx::AbstractString, iterations::Int)
     if approx=="naive" || contains(approx,"tap")
         v_pos, array_h_pos = clamped_equilibrate(dbm,vis,array_hid_init; iterations=iterations, approx=approx)
@@ -42,6 +43,16 @@ function get_positive_samples(dbm::DBM, vis::Mat{Float64}, array_hid_init::Array
     return v_pos, array_h_pos
 end
 
+
+"""
+    # Boltzmann.fit_batch! (TrainingDBM.jl)
+    ## Description
+        - Calls  `get_positive_samples` and `get_negative_samples 
+        - In a bottom-up pass updates the parameters of the RBM components 
+            calling `calculate_weight_gradient` functions designed for RBMs
+        - 'vbias' of l-th RBM is constrained  to be equal to 'hbias' of (l-1)-th RBM 
+            as they actually represent the same units in the DBM
+"""
 function fit_batch!(dbm::DBM, vis::Mat{Float64};
                     persistent=true, lr=0.1, NormalizationApproxIter=1,
                     weight_decay="none",decay_magnitude=0.01, approx="CD")
@@ -104,7 +115,7 @@ function fit_batch!(dbm::DBM, vis::Mat{Float64};
         end
         update_weights!(rbm,approx)
         rbm.hbias += vec(lr * (sum(h_pos, 2) - sum(h_neg, 2)))
-        rbm.vbias = copy(dbm[l-1].hbias) ## Constraining biases of visible units to be equal to biases of hidden units from shallower layer
+        rbm.vbias = copy(dbm[l-1].hbias) ## Constraining biases
     end
     return dbm
 end
@@ -117,9 +128,10 @@ end
                                          decay_magnitude, validation,monitor_ever, monitor_vis,
                                          approx, persistent_start])`
     ## Description
-    The core DBM training function. Learns the weights and biasings using 
-    either standard Contrastive Divergence (CD) or Persistent CD, depending on
-    the user options. 
+    The core DBM training function. Learns the weights and biasings using, depending on user options, either
+     - Contrastive Divergence (CD) for the negative phase and naive Mean Field (MF) for the positive phase
+     or
+     - 1st, 2nd or 3rd order EMF approximation for both negative and positive phase.
     
     - *dbm:* DBM object
     - *X:* Set of training vectors
@@ -248,43 +260,21 @@ end
 """
     # Boltzmann.fit_doubled (TrainingDBM.jl)
     ## Function Call
-        `fit_doubled(dbm::DBM, X::Mat{Float64}, persistent, lr, batch_size, NormalizationApproxIter, weight_decay, 
+        `fit_doubled(dbm::DBM, X::Mat{Float64}, which::AbstractString, persistent, lr, batch_size, NormalizationApproxIter, weight_decay, 
                                          decay_magnitude, validation,monitor_ever, monitor_vis,
                                          approx, persistent_start])`
     ## Description
-    The core RBM training function. Learns the weights and biasings using 
-    either standard Contrastive Divergence (CD) or Persistent CD, depending on
-    the user options. 
-    
+          The core RBM training function is modified for the needs of the DBM pretraining procedure.
+          An auxiliary rbm with duplicated visible or hidden units is trained. 
+          The trained rbm returned has no duplicated units, it has the same dimension as the rbm passed in argument. 
+  
     - *rbm:* RBM object
     - *X:* Set of training vectors
-    - *which*
-
-    ### Optional Inputs
-     - *persistent:* Whether or not to use persistent-CD [default=true]
-     - *persistent_start:* At which epoch to start using the persistent chains. Only
-                           applicable for the case that `persistent=true`.
-                           [default=1]
-     - *lr:* Learning rate [default=0.1]
-     - *n_iter:* Number of training epochs [default=10]
-     - *batch_size:* Minibatch size [default=100]
-     - *NormalizationApproxIter:* Number of Gibbs sampling steps on the Markov Chain [default=1]
-     - *weight_decay:* A string value representing the regularization to add to apply to the 
-                       weight magnitude during training {"none","l1","l2"}. [default="none"]
-     - *decay_magnitude:* Relative importance assigned to the weight regularization. Smaller
-                          values represent less regularization. Should be in range (0,1). 
-                          [default=0.01]
-     - *validation:* An array of validation samples, e.g. a held out set of training data.
-                     If passed, `fit` will also track generalization progress during training.
-                     [default=empty-set]
-     - *score_every:* Controls at which epoch the progress of the fit is monitored. Useful to 
-                      speed up the fit procedure if detailed progress monitoring is not required.
-                      [default=5]
-
+    - *which:* Either  "input"  to train a RBM with two copies of visible units.
+                          Or "output" to train a RBM with two copies of hidden units.
     ## Returns
      - *::RBM* -- A trained RBM model.
 """
-
 function fit_doubled(rbm,X::Mat{Float64}, which::AbstractString;
              persistent=true, lr=0.1, n_iter=10, batch_size=100, NormalizationApproxIter=1,
              weight_decay="none",decay_magnitude=0.01,validation=[],
@@ -409,6 +399,48 @@ function fit_doubled(rbm,X::Mat{Float64}, which::AbstractString;
     end
     return rbm, ProgressMonitor
 end
+
+"""
+    # Boltzmann.prefit (TrainingDBM.jl)
+    ## Function Call
+        `prefit(dbm::DBM, X::Mat{Float64}[, persistent, lr, batch_size, NormalizationApproxIter, weight_decay, 
+                                         decay_magnitude, validation,monitor_ever, monitor_vis,
+                                         approx, persistent_start])`
+    ## Description
+    The greedy layerwise DBM pretraining function. Learns the weights and biasings using 
+    by default standard Contrastive Divergence (CD) (persistent or not), or any EMF approximation
+    depending on user options. 
+    The `fit_doubled` is used for training the first and last RBMs constituting the DBM.
+    For proper scaling, the weights of the intermediary RBMs are halved before returning the final DBM.
+    
+    - *dbm:* DBM object
+    - *X:* Set of training vectors
+
+    ### Optional Inputs
+     - *persistent:* Whether or not to use persistent-CD [default=true]
+     - *persistent_start:* At which epoch to start using the persistent chains. Only
+                           applicable for the case that `persistent=true`.
+                           [default=1]
+     - *lr:* Learning rate [default=0.1]
+     - *n_iter:* Number of training epochs [default=10]
+     - *batch_size:* Minibatch size [default=100]
+     - *NormalizationApproxIter:* Number of Gibbs sampling steps on the Markov Chain [default=1]
+     - *weight_decay:* A string value representing the regularization to add to apply to the 
+                       weight magnitude during training {"none","l1","l2"}. [default="none"]
+     - *decay_magnitude:* Relative importance assigned to the weight regularization. Smaller
+                          values represent less regularization. Should be in range (0,1). 
+                          [default=0.01]
+     - *validation:* An array of validation samples, e.g. a held out set of training data.
+                     If passed, `fit` will also track generalization progress during training.
+                     [default=empty-set]
+     - *score_every:* Controls at which epoch the progress of the fit is monitored. Useful to 
+                      speed up the fit procedure if detailed progress monitoring is not required.
+                      [default=5]
+
+    ## Returns
+     - *::DBM* -- A trained DBM model.
+
+"""
 
 function pre_fit(dbm::DBM, X::Mat{Float64};
              persistent=true, lr=0.1, n_iter=10, batch_size=100, NormalizationApproxIter=1,

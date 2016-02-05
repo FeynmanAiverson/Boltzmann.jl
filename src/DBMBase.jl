@@ -18,11 +18,11 @@ end
 """
     # Boltzmann.DBM (DBMBase.jl)
     ## Description
-        A structure for containing all of the restricted Boltzmann Machine (RBM)
-        model parameters. Besides just the model parameters (couplings, biases),
-        the structure also contains variables which are pertinent to the RBM training
-        procedure.
-
+        A structure for containing all of the Deep Boltzmann Machine (DBM)
+        model parameters, described as a stack of RBMs. 
+        Note that the l-th layer of hidden units is, in term of RBM vocabulary, 
+        the l-th RBM 'visible' layer as well as the (l-1)-th RBM 'hidden' layer. 
+        Thus, it is always ensured that neighboring RBMs share the same vector of biases for their common layer.
     ## Structure
         - `layers`
         - `layernames
@@ -38,6 +38,9 @@ DBM{T<:@compat(Tuple{AbstractString,RBM})}(namedlayers::Vector{T}) =
 
 """
     # Boltzmann.PassVisHid2ToHid1  (DBMBase.jl)
+    ## Description 
+        Function computing the linear combination of 
+        both bottom-up and top-down inputs for intermediate layers.
 """
 function PassVisHid2ToHid1(rbm1::RBM, vis::Mat{Float64}, rbm2::RBM, hid2::Mat{Float64})
     return rbm2.W' * hid2 .+ rbm1.W * vis .+ rbm1.hbias
@@ -46,7 +49,7 @@ end
 ### These functions need to be generalized to detect the Distribution on 
 ### the hidden and visible variables.
 """
-    # Boltzmann.ProbHidCondOnNeighbors  (RBMBase.jl)
+    # Boltzmann.ProbHidCondOnNeighbors  (DBMBase.jl)
 """
 function ProbHidCondOnNeighbors(rbm1::RBM, vis::Mat{Float64}, rbm2::RBM, hid2::Mat{Float64})
     return logsig(PassVisHid2ToHid1(rbm1,vis,rbm2,hid2))
@@ -56,7 +59,7 @@ end
 """
     # Boltzmann.ProbHidAtLayerCondOnVis (DBMBase.jl)
     ## Description 
-        Function performing naive MF approximate inference
+        Function performing naive MF approximate bottom-up inference up to specified layer
         TODO : add DBM specific augmented input 
 """
 
@@ -70,9 +73,10 @@ function ProbHidAtLayerCondOnVis(net::Net, vis::Mat{Float64}, layer::Int)
 end
 
 """
-    # Boltzmann.EMFProbHidInitCondOnVis (DBMBase.jl)
+    # Boltzmann.ProbHidInitCondOnVis (DBMBase.jl)
     ## Description 
-        Function performing naive MF approximate inference
+        Function performing naive MF approximate bottom-up inference
+        returning complete array of hidden units marginals
         TODO : add DBM specific augmented input 
 """
 
