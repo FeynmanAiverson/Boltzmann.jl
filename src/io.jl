@@ -64,15 +64,15 @@ end
 
 function save_params(file::HDF5File, rbm::RBM, name::AbstractString, rbmname::AbstractString, VisShape::Array{Int64,1} )
     write(file, "$(name)/$(rbmname)/W", rbm.W)
-    write(file, "$(name)/$(rbmname)/W2", rbm.W2)    
-    write(file, "$(name)/$(rbmname)/W3", rbm.W3)    
+    # write(file, "$(name)/$(rbmname)/W2", rbm.W2)    
+    # write(file, "$(name)/$(rbmname)/W3", rbm.W3)    
     write(file, "$(name)/$(rbmname)/vbias", rbm.vbias)
     write(file, "$(name)/$(rbmname)/hbias", rbm.hbias)
-    write(file, "$(name)/$(rbmname)/dW", rbm.dW)
-    write(file, "$(name)/$(rbmname)/dW_prev", rbm.dW_prev)
+    # write(file, "$(name)/$(rbmname)/dW", rbm.dW)
+    # write(file, "$(name)/$(rbmname)/dW_prev", rbm.dW_prev)
     write(file, "$(name)/$(rbmname)/persistent_chain_vis", rbm.persistent_chain_vis)
     write(file, "$(name)/$(rbmname)/persistent_chain_hid", rbm.persistent_chain_hid)
-    write(file, "$(name)/$(rbmname)/momentum", rbm.momentum)  
+    # write(file, "$(name)/$(rbmname)/momentum", rbm.momentum)  
     write(file, "$(name)/$(rbmname)/VisShape", VisShape)
 end
 
