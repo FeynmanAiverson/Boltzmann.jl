@@ -168,7 +168,8 @@ function fit(dbm::DBM, X::Mat{Float64};
              persistent=true, lr=0.1, n_iter=10, batch_size=100, NormalizationApproxIter=1,
              weight_decay="none",decay_magnitude=0.01,validation=[],
              monitor_every=5,monitor_vis=false, approx="CD",
-             persistent_start=1)
+             persistent_start=1,
+             save_progress = nothing)
 
     # TODO: This line needs to be changed to accomodate real-valued units
     @assert minimum(X) >= 0 && maximum(X) <= 1
@@ -252,6 +253,21 @@ function fit(dbm::DBM, X::Mat{Float64};
         
         UpdateMonitor!(dbm,ProgressMonitor,X,itr;bt=walltime_µs,validation=validation)
         ShowMonitor(dbm,ProgressMonitor,X,itr)
+
+        # Attempt to save parameters if need be
+        if save_progress != nothing 
+        	if itr%save_progress[2]==0
+               	rootName = @sprintf("Epoch%04d",itr)
+                 	if isfile(save_progress[1])
+                     		info("Appending Params...")
+                     		append_params(save_progress[1],dbm,rootName)
+                 	else
+                     		info("Creating file and saving params...")
+                     		save_params(save_progress[1],dbm,rootName)
+                 	end
+             	end
+        end
+
     end
 
     return dbm, ProgressMonitor
