@@ -29,7 +29,7 @@ function get_positive_samples(dbm::DBM, vis::Mat{Float64}, array_hid_init::Array
     if approx=="naive" || contains(approx,"tap")
         v_pos, array_h_pos = clamped_equilibrate(dbm,vis,array_hid_init; iterations=iterations, approx=approx)
     end
-
+    
     if approx=="mixed"
         v_pos, array_h_pos = clamped_equilibrate(dbm,vis,array_hid_init; iterations=iterations, approx="naive")
     end
