@@ -56,7 +56,7 @@ end
 ################# DBM methods #####################################################################################
 ## DBM : the computation of the clamped free requires an equilibration . ##
 ## The following function calls on 'get_positive_sampling' ##
-function free_energy(dbm::DBM, vis::Mat{Float64}; n_iter=5)
+function free_energy(dbm::DBM, vis::Mat{Float64}; n_iter=10)
     depth=length(dbm)
     array_h_pos_init = ProbHidInitCondOnVis(dbm, vis)
     mv_pos, array_mh_pos = get_positive_samples(dbm, vis, array_h_pos_init, "tap2", n_iter)
