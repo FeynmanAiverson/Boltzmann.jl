@@ -33,9 +33,10 @@ end
 function update_weights!(rbm::RBM,approx::AbstractString)
     axpy!(1.0,rbm.dW,rbm.W)             # Take step: W = W + dW
     copy!(rbm.dW_prev, rbm.dW)          # Save the current step for future use
-    if contains(approx,"tap")
-        rbm.W2 = rbm.W  .* rbm. W       # Update Square [for EMF-TAP2]
-    end
+    # if contains(approx,"tap")
+    #     rbm.W2 = rbm.W  .* rbm. W       # Update Square [for EMF-TAP2]
+    # end
+    rbm.W2 = rbm.W  .* rbm. W
     if approx == "tap3"
         rbm.W3 = rbm.W2 .* rbm.W        # Update Cube   [for EMF-TAP3]
     end
