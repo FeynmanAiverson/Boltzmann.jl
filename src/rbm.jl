@@ -270,7 +270,7 @@ the user options.
         end
         walltime_µs=(toq()/n_batches/N)*1e6
         
-        UpdateMonitor!(rbm,ProgressMonitor,X,itr;bt=walltime_µs,validation=validation)
+        update_monitor!(rbm,ProgressMonitor,X,itr;bt=walltime_µs,validation=validation)
         show_monitor(rbm,ProgressMonitor,itr)
     end
 

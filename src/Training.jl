@@ -272,7 +272,7 @@ function fit(rbm::RBM, X::Mat{Float64};
         # Get the average wall-time in µs
         walltime_µs=(toq()/n_batches/N)*1e6
         
-        UpdateMonitor!(rbm,ProgressMonitor,X,itr;bt=walltime_µs,validation=validation,lr=lr,mo=rbm.momentum)
+        update_monitor!(rbm,ProgressMonitor,X,itr;bt=walltime_µs,validation=validation,lr=lr,mo=rbm.momentum)
         show_monitor(rbm,ProgressMonitor,X,itr)
 
         # Attempt to save parameters if need be

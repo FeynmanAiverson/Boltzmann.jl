@@ -61,7 +61,7 @@ function Monitor(n_iter,monitor_every;monitor_vis=false,monitor_txt=true,validat
             fh)                  # Monitor Figure Handle
 end
 
-function UpdateMonitor!(rbm::RBM,mon::Monitor,dataset::Mat{Float64},itr::Int;validation=[],bt=NaN,lr=NaN,mo=NaN)
+function update_monitor!(rbm::RBM,mon::Monitor,dataset::Mat{Float64},itr::Int;validation=[],bt=NaN,lr=NaN,mo=NaN)
     nh = size(rbm.W,1)
     nv = size(rbm.W,2)
     N = nh + nv
