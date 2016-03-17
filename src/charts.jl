@@ -130,7 +130,7 @@ function figure_refresh(figureHandle)
 end
 
 
-function WriteMonitorChartPDF(rbm::RBM,mon::Monitor,X::Mat{Float64},filename::AbstractString)
+function write_monitor_chart_pdf(rbm::RBM,mon::Monitor,X::Mat{Float64},filename::AbstractString)
     savefig = plt.figure(5;figsize=(12,15))
     # Show Per-Epoch Progres
     savefig[:add_subplot](231)
@@ -163,7 +163,7 @@ end
 
 
 
-function ShowMonitor(rbm::RBM,mon::Monitor,X::Mat{Float64},itr::Int;filename=[])
+function show_monitor(rbm::RBM,mon::Monitor,X::Mat{Float64},itr::Int;filename=[])
     fig = mon.FigureHandle
 
     if mon.MonitorVisual && itr%mon.MonitorEvery==0

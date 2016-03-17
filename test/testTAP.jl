@@ -10,7 +10,7 @@ function run_mnist()
 
     TrainSet = X
     ValidSet = []
-    HiddenUnits = 500;
+    HiddenUnits = 50;
     Epochs = 10;
     MCMCIter = 1;
     EMFIter = 3
@@ -35,7 +35,7 @@ function run_mnist()
                           approx="tap2",
                           persistent_start=EMFPersistStart)
 
-    WriteMonitorChartPDF(finalrbmtap2,monitor,X,"testmonitor_tap2.pdf")
+    write_monitor_chart_pdf(finalrbmtap2,monitor,X,"testmonitor_tap2.pdf")
     SaveMonitorHDF5(monitor,"testmonitor_tap2.h5")
 
     finalrbmnaive,monitor = fit(rbm2, TrainSet;n_iter=Epochs,
@@ -50,7 +50,7 @@ function run_mnist()
                           approx="naive",
                           persistent_start=EMFPersistStart)
 
-    WriteMonitorChartPDF(finalrbmnaive,monitor,X,"testmonitor_naive.pdf")
+    write_monitor_chart_pdf(finalrbmnaive,monitor,X,"testmonitor_naive.pdf")
     SaveMonitorHDF5(monitor,"testmonitor_naive.h5")
 
     finalrbmCD,monitor = fit(rbm3, TrainSet;n_iter=Epochs,
@@ -64,7 +64,7 @@ function run_mnist()
                           monitor_vis=true,
                           approx="CD")
 
-    WriteMonitorChartPDF(finalrbmCD,monitor,X,"testmonitor_CD.pdf")
+    write_monitor_chart_pdf(finalrbmCD,monitor,X,"testmonitor_CD.pdf")
     SaveMonitorHDF5(monitor,"testmonitor_CD.h5")
 end
 

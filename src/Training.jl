@@ -273,7 +273,7 @@ function fit(rbm::RBM, X::Mat{Float64};
         walltime_µs=(toq()/n_batches/N)*1e6
         
         UpdateMonitor!(rbm,ProgressMonitor,X,itr;bt=walltime_µs,validation=validation,lr=lr,mo=rbm.momentum)
-        ShowMonitor(rbm,ProgressMonitor,X,itr)
+        show_monitor(rbm,ProgressMonitor,X,itr)
 
         # Attempt to save parameters if need be
         if save_progress != nothing 

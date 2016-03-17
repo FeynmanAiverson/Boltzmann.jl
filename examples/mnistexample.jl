@@ -41,7 +41,7 @@ function run_mnist()
                                    approx           = Approx,
                                    persistent_start = PersistStart)
 
-    WriteMonitorChartPDF(rbm,monitor,X,"mnistexample_learning.pdf")
+    write_monitor_chart_pdf(rbm,monitor,X,"mnistexample_learning.pdf")
     save_params("mnistexample_params.h5",rbm,"mnistexample");
 end
 
