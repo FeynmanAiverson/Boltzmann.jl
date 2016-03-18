@@ -314,3 +314,64 @@ function random_columns(x::Mat{Float64},n_select::Int)
 
     return y, perm
 end
+
+
+"""
+  # Boltzmann.require_parameter (utils.jl)
+  ## Function Calls
+    `require_parameter(D::Dict,key::Any) 
+  ## Description
+    Throw an assertion error if the required key is missing from the
+    passed dictionary. Also throw an assertion error if the key exists
+    in the dictionary, but its conent is `nothing`.
+
+  ## Returns
+    Nothing
+"""
+function require_parameter(D,key)
+  haskey(D,key) ? nothing : 
+                  throw(AssertionError("Required option `:$key` missing"))
+  D[key] != nothing ? nothing :
+                  throw(AssertionError("Required option `:$key` is blank"))                  
+end
+
+
+"""
+  # Boltzmann.dictionary_union (utils.jl)
+  ## Function Calls
+    `dictionary_union(oldD::Dict,newD::Dict)`
+  ## Description
+    Perform a union on the key values of the two dictionaries, and
+    in the case of collisions, overwrite the values of the old dictionary,
+    (left) with those of the new dictionary (right).
+
+  ## Returns
+    1. A new Dictionary
+"""
+function dictionary_union(oldD::Dict,newD::Dict)
+  # Iterate over the keys in the new dictionary
+  for key in keys(newD)
+    oldD[key] = newD[key]
+  end
+
+  return oldD
+end
+"""
+  # Boltzmann.dictionary_union! (utils.jl)
+  ## Function Calls
+    `dictionary_union!(oldD::Dict,newD::Dict)`
+  ## Description
+    Perform a union on the key values of the two dictionaries, and
+    in the case of collisions, overwrite in place 
+    the values of the old dictionary, (left) with those of the 
+    new dictionary (right).
+
+  ## Returns
+    Nothing
+"""
+function dictionary_union!(oldD::Dict,newD::Dict)
+  # Iterate over the keys in the new dictionary
+  for key in keys(newD)
+    oldD[key] = newD[key]
+  end
+end

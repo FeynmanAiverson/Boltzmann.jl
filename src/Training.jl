@@ -195,11 +195,26 @@ end
      - *::Monitor* -- A Monitor structure containing information on the training progress over
                       epochs.
 """
-function fit(rbm::RBM, X::Mat{Float64};
-             persistent=true, lr=0.1, n_iter=10, batch_size=100, NormalizationApproxIter=1,
-             weight_decay="none",decay_magnitude=0.01,validation=[],
-             monitor_every=5,monitor_vis=false, approx="CD",
-             persistent_start=1, save_progress=nothing)
+function fit(rbm::RBM, X::Mat{Float64}, options::Dict)    
+    # Copy user options onto the default dictionary
+    options = dictionary_union(default_train_parameters(),options)
+    require_parameter(options,:learnRate)
+    require_parameter(options,:batchSize)    
+
+    # TOCHANGE: Copying over from dictionary onto the same variables
+    persistent=options[:persist]
+    lr=options[:learnRate]
+    n_iter=options[:epochs]
+    batch_size=options[:batchSize]
+    NormalizationApproxIter=options[:approxIters]
+    weight_decay=options[:weightDecayType]
+    decay_magnitude=options[:weightDecayMagnitude]
+    validation=options[:validationSet]
+    monitor_every=options[:monitorEvery]
+    monitor_vis=options[:monitorVis]
+    approx=options[:approxType]
+    persistent_start=options[:persistStart]
+    save_progress=(options[:saveFile],options[:saveEvery])
 
     # TODO: This line needs to be changed to accomodate real-valued units
     @assert minimum(X) >= 0 && maximum(X) <= 1
@@ -276,16 +291,14 @@ function fit(rbm::RBM, X::Mat{Float64};
         show_monitor(rbm,ProgressMonitor,X,itr)
 
         # Attempt to save parameters if need be
-        if save_progress != nothing 
-            if itr%save_progress[2]==0
-                rootName = @sprintf("Epoch%04d",itr)
-                if isfile(save_progress[1])
-                    info("Appending Params...")
-                    append_params(save_progress[1],rbm,rootName)
-                else
-                    info("Creating file and saving params...")
-                    save_params(save_progress[1],rbm,rootName)
-                end
+        if itr%save_progress[2]==0
+            rootName = @sprintf("Epoch%04d",itr)
+            if isfile(save_progress[1])
+                info("Appending Params...")
+                append_params(save_progress[1],rbm,rootName)
+            else
+                info("Creating file and saving params...")
+                save_params(save_progress[1],rbm,rootName)
             end
         end
     end
@@ -306,6 +319,8 @@ function default_train_parameters()
              :weightDecayMagnitude => Float64(0.0),
              :validationSet => Array(Float64,0,0),
              :monitorEvery => Integer(1),
-             :showMonitor => true)
+             :showMonitor => true,
+             :saveEvery => Inf,
+             :saveFile => AbstractString(""))
     return D    
 end

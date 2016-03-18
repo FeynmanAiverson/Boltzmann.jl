@@ -14,56 +14,48 @@ function run_mnist()
     Epochs = 10;
     MCMCIter = 1;
     EMFIter = 3
-    LearnRate = 0.005
-    MonitorEvery=2
     EMFPersistStart=5
 
+    # Set Global Training Parameters
+    options = Dict()
+    options[:epochs] = 10
+    options[:batchSize] = 100
+    options[:learnRate] = 0.005
+    options[:persist] = true
+    options[:monitorEvery] = 2
+    options[:monitorVis] = true
+    options[:weightDecayType] = "l2"
+    options[:weightDecayMagnitude] = 0.001
+    options[:validationSet] = []
+    # CD params
+    cdOptions = deepcopy(options)
+    cdOptions[:approxType] = "CD"
+    # TAP params
+    tapOptions = deepcopy(options)
+    tapOptions[:approxType] = "tap2"
+    tapOptions[:approxIters] = 3
+    tapOptions[:persistStart] = 5
+    # NMF params
+    nmfOptions = deepcopy(tapOptions)
+    nmfOptions[:approxType] = "naive"
+
+    # Initialize models
     rbm1 = BernoulliRBM(28*28, HiddenUnits, (28,28); momentum=0.5, TrainData=TrainSet, sigma = 0.01)
     rbm2 = BernoulliRBM(28*28, HiddenUnits, (28,28); momentum=0.5, TrainData=TrainSet, sigma = 0.01)
     rbm3 = BernoulliRBM(28*28, HiddenUnits, (28,28); momentum=0.5, TrainData=TrainSet, sigma = 0.01)
 
-
-    finalrbmtap2,monitor = fit(rbm1, TrainSet;n_iter=Epochs,
-                          weight_decay="l2",
-                          decay_magnitude=0.001,
-                          lr=LearnRate,
-                          persistent=true,
-                          validation=ValidSet,
-                          NormalizationApproxIter=EMFIter,
-                          monitor_every=MonitorEvery,
-                          monitor_vis=true,
-                          approx="tap2",
-                          persistent_start=EMFPersistStart)
-
+    # Train TAP
+    finalrbmtap2,monitor = fit(rbm1, TrainSet, tapOptions)
     write_monitor_chart_pdf(finalrbmtap2,monitor,X,"testmonitor_tap2.pdf")
     save_monitor_hdf5(monitor,"testmonitor_tap2.h5")
 
-    finalrbmnaive,monitor = fit(rbm2, TrainSet;n_iter=Epochs,
-                          weight_decay="l2",
-                          decay_magnitude=0.001,
-                          lr=LearnRate,
-                          persistent=true,
-                          validation=ValidSet,
-                          NormalizationApproxIter=EMFIter,
-                          monitor_every=MonitorEvery,
-                          monitor_vis=true,
-                          approx="naive",
-                          persistent_start=EMFPersistStart)
-
+    # Train NMF
+    finalrbmnaive,monitor = fit(rbm2, TrainSet, nmfOptions)
     write_monitor_chart_pdf(finalrbmnaive,monitor,X,"testmonitor_naive.pdf")
     save_monitor_hdf5(monitor,"testmonitor_naive.h5")
 
-    finalrbmCD,monitor = fit(rbm3, TrainSet;n_iter=Epochs,
-                          weight_decay="l2",
-                          decay_magnitude=0.001,
-                          lr=LearnRate,
-                          persistent=true,                          
-                          validation=ValidSet,
-                          NormalizationApproxIter=MCMCIter,
-                          monitor_every=MonitorEvery,
-                          monitor_vis=true,
-                          approx="CD")
-
+    # Train CD
+    finalrbmCD,monitor = fit(rbm3, TrainSet, cdOptions)
     write_monitor_chart_pdf(finalrbmCD,monitor,X,"testmonitor_CD.pdf")
     save_monitor_hdf5(monitor,"testmonitor_CD.h5")
 end
