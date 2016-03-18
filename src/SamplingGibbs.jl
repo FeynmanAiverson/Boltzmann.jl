@@ -21,12 +21,12 @@ function sample(::Type{Gaussian}, means::Mat{Float64})
 end
     
 function sample_hiddens{V,H}(rbm::RBM{V,H}, vis::Mat{Float64})
-    means = ProbHidCondOnVis(rbm, vis)
+    means = condprob_hid(rbm, vis)
     return sample(H, means), means
 end
 
 function sample_visibles{V,H}(rbm::RBM{V,H}, hid::Mat{Float64})
-    means = ProbVisCondOnHid(rbm, hid)
+    means = condprob_vis(rbm, hid)
     return sample(V, means), means
 end
 
@@ -49,7 +49,7 @@ function gibbs(rbm::RBM, vis::Mat{Float64}; n_times=1)
     return v_pos, h_pos, v_neg, h_neg
 end
 
-function MCMC(rbm::RBM, init::Mat{Float64}; iterations=1, StartMode="visible")    
+function mcmc(rbm::RBM, init::Mat{Float64}; iterations=1, StartMode="visible")    
     if StartMode == "visible"
     # In this first mode we assume that we are starting from the visible samples. E.g. in
     # the case of binary RBM, we should be starting with binary samples.

@@ -36,7 +36,7 @@ function run_mnist()
                           persistent_start=EMFPersistStart)
 
     write_monitor_chart_pdf(finalrbmtap2,monitor,X,"testmonitor_tap2.pdf")
-    SaveMonitorHDF5(monitor,"testmonitor_tap2.h5")
+    save_monitor_hdf5(monitor,"testmonitor_tap2.h5")
 
     finalrbmnaive,monitor = fit(rbm2, TrainSet;n_iter=Epochs,
                           weight_decay="l2",
@@ -51,7 +51,7 @@ function run_mnist()
                           persistent_start=EMFPersistStart)
 
     write_monitor_chart_pdf(finalrbmnaive,monitor,X,"testmonitor_naive.pdf")
-    SaveMonitorHDF5(monitor,"testmonitor_naive.h5")
+    save_monitor_hdf5(monitor,"testmonitor_naive.h5")
 
     finalrbmCD,monitor = fit(rbm3, TrainSet;n_iter=Epochs,
                           weight_decay="l2",
@@ -65,7 +65,7 @@ function run_mnist()
                           approx="CD")
 
     write_monitor_chart_pdf(finalrbmCD,monitor,X,"testmonitor_CD.pdf")
-    SaveMonitorHDF5(monitor,"testmonitor_CD.h5")
+    save_monitor_hdf5(monitor,"testmonitor_CD.h5")
 end
 
 run_mnist()

@@ -81,7 +81,7 @@ end
 ### To be deprecated
 function iter_mag(rbm::RBM, vis::Mat{Float64}; n_times=3, approx="tap2")
     v_pos = vis
-    h_pos = ProbHidCondOnVis(rbm, v_pos)
+    h_pos = condprob_hid(rbm, v_pos)
 
     if approx == "naive"
         mag_vis = mag_vis_naive
@@ -106,7 +106,7 @@ end
 
 function iter_mag_persist!(rbm::RBM, vis::Mat{Float64}; n_times=3, approx="tap2")
     v_pos = vis
-    h_pos = ProbHidCondOnVis(rbm, v_pos)
+    h_pos = condprob_hid(rbm, v_pos)
     
     if approx == "naive"
         mag_vis = mag_vis_naive

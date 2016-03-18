@@ -63,9 +63,9 @@ function get_negative_samples(rbm::RBM,vis_init::Mat{Float64},hid_init::Mat{Floa
     end
 
     if approx=="CD"
-        # In the case of Gibbs/MCMC sampling, we will take the binary visible samples as the negative
+        # In the case of Gibbs/mcmc sampling, we will take the binary visible samples as the negative
         # visible samples, and the expectation (means) for the negative hidden samples.
-        v_neg, _, _, h_neg = MCMC(rbm, hid_init; iterations=iterations, StartMode="hidden")
+        v_neg, _, _, h_neg = mcmc(rbm, hid_init; iterations=iterations, StartMode="hidden")
     end
 
     return v_neg, h_neg
@@ -81,7 +81,7 @@ function generate(rbm::RBM,vis_init::Mat{Float64},approx::AbstractString,Samplin
     end
 
     if approx=="CD"
-        _, hid_mag, _, _ = MCMC(rbm, vis_init; iterations=SamplingIterations, StartMode="visible")
+        _, hid_mag, _, _ = mcmc(rbm, vis_init; iterations=SamplingIterations, StartMode="visible")
     end
 
     samples,_ = sample_visibles(rbm,hid_mag)
@@ -247,7 +247,7 @@ function fit(rbm::RBM, X::Mat{Float64};
 
     # Random initialization of the persistent chains
     rbm.persistent_chain_vis,_ = random_columns(X,batch_size)
-    rbm.persistent_chain_hid = ProbHidCondOnVis(rbm, rbm.persistent_chain_vis)
+    rbm.persistent_chain_hid = condprob_hid(rbm, rbm.persistent_chain_vis)
 
     use_persistent = false
     for itr=1:n_iter

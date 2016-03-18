@@ -94,39 +94,39 @@ GRBM(n_vis::Int, n_hid::Int, visshape::Tuple{Int,Int}; sigma=0.1, momentum=0.0, 
 
 
 """
-    # Boltzmann.PassHidToVis  (RBMBase.jl)
+    # Boltzmann.hid_to_vis  (RBMBase.jl)
 """
-function PassHidToVis(rbm::RBM, hid::Mat{Float64})
+function hid_to_vis(rbm::RBM, hid::Mat{Float64})
     return rbm.W' * hid .+ rbm.vbias
 end
 
 """
-    # Boltzmann.PassVisToHid  (RBMBase.jl)
+    # Boltzmann.vis_to_hid  (RBMBase.jl)
 """
-function PassVisToHid(rbm::RBM, vis::Mat{Float64})
+function vis_to_hid(rbm::RBM, vis::Mat{Float64})
     return rbm.W * vis .+ rbm.hbias
 end
 
 ### These functions need to be generalized to detect the Distribution on 
 ### the hidden and visible variables.
 """
-    # Boltzmann.ProbHidCondOnVis  (RBMBase.jl)
+    # Boltzmann.condprob_hid  (RBMBase.jl)
 """
-function ProbHidCondOnVis(rbm::RBM, vis::Mat{Float64})
-    return logsig(PassVisToHid(rbm,vis))
+function condprob_hid(rbm::RBM, vis::Mat{Float64})
+    return logsig(vis_to_hid(rbm,vis))
 end
 
 """
-    # Boltzmann.ProbVisCondOnHid  (RBMBase.jl)
+    # Boltzmann.condprob_vis  (RBMBase.jl)
 """
-function ProbVisCondOnHid(rbm::RBM, hid::Mat{Float64})
-    return logsig(PassHidToVis(rbm,hid))
+function condprob_vis(rbm::RBM, hid::Mat{Float64})
+    return logsig(hid_to_vis(rbm,hid))
 end
 
 """
-    # Boltzmann.PinField! (RBMBase.jl)
+    # Boltzmann.pin_field! (RBMBase.jl)
 """
-function PinField!(rbm::RBM,pinning_field::Vec{Float64})
+function pin_field!(rbm::RBM,pinning_field::Vec{Float64})
     pos_inf_locations = pinning_field > 0
     neg_inf_locations = pinning_field < 0
 

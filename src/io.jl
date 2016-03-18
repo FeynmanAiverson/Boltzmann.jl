@@ -51,7 +51,7 @@ load_params(path::AbstractString, net::Net) = h5open(path) do h5
     load_params(h5, net)
 end
 
-function SaveMonitorHDF5(mon::Monitor,filename::AbstractString)
+function save_monitor_hdf5(mon::Monitor,filename::AbstractString)
     h5open(filename , "w") do file
         # write(file, "LastIndex", mon.LastIndex)
         # write(file, "UseValidation", mon.UseValidation)

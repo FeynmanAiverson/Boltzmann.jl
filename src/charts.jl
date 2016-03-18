@@ -36,7 +36,7 @@ function plot_hidden_activations(rbm::RBM,X::Mat{Float64})
     x,_ = random_columns(X,n_samples)
 
     # Get all hidden activations for batch    
-    act = ProbHidCondOnVis(rbm,x)
+    act = condprob_hid(rbm,x)
     # Show this matrix of activations
     plt.imshow(act;interpolation="Nearest")
     plt.title("Hidden Unit Activations")

@@ -71,7 +71,7 @@ function update_monitor!(rbm::RBM,mon::Monitor,dataset::Mat{Float64},itr::Int;va
     if itr%mon.MonitorEvery==0
         if mon.UseValidation 
             vpl = mean(score_samples(rbm, validation))/N
-            vtl = mean(score_samples_TAP(rbm, validation))/N
+            vtl = mean(score_samples_tap(rbm, validation))/N
             vre = recon_error(rbm,validation)/N
         else
             vpl = NaN
@@ -79,7 +79,7 @@ function update_monitor!(rbm::RBM,mon::Monitor,dataset::Mat{Float64},itr::Int;va
             vre = NaN
         end
         pl = mean(score_samples(rbm, dataset[:,1:nsamps]))/N  
-        tl = mean(score_samples_TAP(rbm, dataset[:,1:nsamps]))/N    
+        tl = mean(score_samples_tap(rbm, dataset[:,1:nsamps]))/N    
         re = recon_error(rbm,dataset[:,1:nsamps])/N
 
         mon.LastIndex+=1

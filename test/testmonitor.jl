@@ -35,7 +35,7 @@ function run_mnist()
     info("===============================")
 
     write_monitor_chart_pdf(finalrbm,monitor,X,"testmonitor.pdf")
-    SaveMonitorHDF5(monitor,"testmonitor.h5")
+    save_monitor_hdf5(monitor,"testmonitor.h5")
 end
 
 run_mnist()

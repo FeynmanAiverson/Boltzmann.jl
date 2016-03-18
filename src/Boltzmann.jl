@@ -27,7 +27,7 @@ export RBM,
        normalize_samples!,
        show_monitor,
        write_monitor_chart_pdf,
-       SaveMonitorHDF5,
+       save_monitor_hdf5,
        plot_scores,
        plot_evolution,
        plot_rf,
@@ -35,7 +35,7 @@ export RBM,
        plot_vbias,
        plot_weightdist,
        chart_likelihood_evolution,
-       PinField!
+       pin_field!
 
 include("core.jl")
 
