@@ -206,32 +206,32 @@ function fit(rbm::RBM, X::Mat{Float64}, opts::Dict)
     # TODO: This line needs to be changed to accomodate real-valued units
     @assert minimum(X) >= 0 && maximum(X) <= 1
 
-    n_valid=0
-    n_features = size(X, 1)
-    n_samples = size(X, 2)
-    n_hidden = size(rbm.W,1)
-    n_batches = @compat Int(ceil(n_samples / opts[:batchSize]))
-    N = n_hidden+n_features
+    nValidation=0
+    nFeatures = size(X, 1)
+    nSamples = size(X, 2)
+    nHidden = size(rbm.W,1)
+    nBatches = @compat Int(ceil(nSamples / opts[:batchSize]))
+    N = nHidden+nFeatures
 
     # Check for the existence of a validation set
-    flag_use_validation=false
+    useValidation=false
     if !isempty(opts[:validationSet])
-        flag_use_validation=true
-        n_valid=size(opts[:validationSet],2)        
+        useValidation=true
+        nValidation=size(opts[:validationSet],2)        
     end
 
     # Create the historical monitor
     progressMonitor = Monitor(opts[:epochs],opts[:monitorEvery];
                               monitor_vis=opts[:monitorVis],
-                              validation=flag_use_validation)
+                              validation=useValidation)
 
     # Print info to user
     info("=====================================")
     info("RBM Training")
     info("=====================================")
-    info("  + Training Samples:     $n_samples")
-    info("  + Features:             $n_features")
-    info("  + Hidden Units:         $n_hidden")
+    info("  + Training Samples:     $nSamples")
+    info("  + Features:             $nFeatures")
+    info("  + Hidden Units:         $nHidden")
     info("  + Epochs to run:        $(opts[:epochs])")
     info("  + Persistent ?:         $(opts[:persist])")
     info("  + Training approx:      $(opts[:approxType])")
@@ -240,8 +240,8 @@ function fit(rbm::RBM, X::Mat{Float64}, opts::Dict)
     info("  + Norm. Approx. Iters:  $(opts[:approxIters])")   
     info("  + Weight Decay?:        $(opts[:weightDecayType])") 
     info("  + Weight Decay Mag.:    $(opts[:weightDecayMagnitude])")
-    info("  + Validation Set?:      $flag_use_validation")    
-    info("  + Validation Samples:   $n_valid")   
+    info("  + Validation Set?:      $useValidation")    
+    info("  + Validation Samples:   $nValidation")   
     info("=====================================")
 
     # Random initialization of the persistent chains
@@ -256,7 +256,7 @@ function fit(rbm::RBM, X::Mat{Float64}, opts::Dict)
         tic()
 
         # Mini-batch fitting loop. 
-        @showprogress 1 "Fitting Batches..." for i=1:n_batches
+        @showprogress 1 "Fitting Batches..." for i=1:nBatches
             batch = X[:, ((i-1)*opts[:batchSize] + 1):min(i*opts[:batchSize], end)]
             batch = full(batch)
           
@@ -270,7 +270,7 @@ function fit(rbm::RBM, X::Mat{Float64}, opts::Dict)
         end
         
         # Get the average wall-time in µs
-        walltime_µs=(toq()/n_batches/N)*1e6
+        walltime_µs=(toq()/nBatches/N)*1e6
         
         update_monitor!(rbm,progressMonitor,X,itr;
                         bt=walltime_µs,
