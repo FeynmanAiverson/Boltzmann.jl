@@ -1,4 +1,3 @@
-
 using Distributions
 using ProgressMeter
 using Base.LinAlg.BLAS
@@ -11,37 +10,48 @@ using PyCall
 
 import StatsBase.fit
 
-function calculate_weight_gradient!(rbm::RBM, h_pos::Mat{Float64}, v_pos::Mat{Float64}, h_neg::Mat{Float64}, v_neg::Mat{Float64}, lr::Float64; approx="CD")
+function calculate_weight_gradient!(rbm::RBM, h_pos::Mat{Float64}, 
+                                    v_pos::Mat{Float64}, h_neg::Mat{Float64}, 
+                                    v_neg::Mat{Float64}, lr::Float64; 
+                                    approx=:sampling)
     ## Load step buffer with negative-phase    
-    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, rbm.dW)          # dW <- LearRate*<h_neg,v_neg>
+    # dW <- LearRate*<h_neg,v_neg>
+    gemm!('N', 'T', lr, h_neg, v_neg, 0.0, rbm.dW)          
     ## Stubtract step buffer from positive-phase to get gradient    
-    gemm!('N', 'T', lr, h_pos, v_pos, -1.0, rbm.dW)         # dW <- LearnRate*<h_pos,v_pos> - dW
+    # dW <- LearnRate*<h_pos,v_pos> - dW
+    gemm!('N', 'T', lr, h_pos, v_pos, -1.0, rbm.dW)         
     ## Second-Order EMF Correction (for EMF-TAP2, EMF-TAP3)
-    if contains(approx,"tap") 
+    if approx==:emf2 || approx==:emf3 
         buf2 = gemm('N', 'T', h_neg-abs2(h_neg), v_neg-abs2(v_neg)) .* rbm.W  
         axpy!(-lr, buf2, rbm.dW)
     end
     ## Third-Order EMF Correction (for EMF-TAP3)
-    if approx == "tap3"
-        buf3 = gemm('N','T', (h_neg-abs2(h_neg)) .* (0.5-h_neg), (v_neg-abs2(v_neg)) .* (0.5-v_neg)) .* rbm.W2
+    if approx==:emf3
+        termOne = (h_neg-abs2(h_neg)) .* (0.5-h_neg)
+        termTwo = (v_neg-abs2(v_neg)) .* (0.5-v_neg)
+        buf3 = gemm('N','T', termOne, termTwo) .* rbm.W2
         axpy!(-2.0*lr, buf3, rbm.dW)  
     end    
     ## Apply Momentum (adding last gradient to this one)    
-    axpy!(rbm.momentum, rbm.dW_prev, rbm.dW)    # rbm.dW += rbm.momentum * rbm.dW_prev
+    # rbm.dW += rbm.momentum * rbm.dW_prev
+    axpy!(rbm.momentum, rbm.dW_prev, rbm.dW)    
 end
 
-function update_weights!(rbm::RBM,approx::AbstractString)
+function update_weights!(rbm::RBM,approx)
     axpy!(1.0,rbm.dW,rbm.W)             # Take step: W = W + dW
     copy!(rbm.dW_prev, rbm.dW)          # Save the current step for future use
-    if contains(approx,"tap")
+    if approx==:emf2 || approx==:emf3 
         rbm.W2 = rbm.W  .* rbm. W       # Update Square [for EMF-TAP2]
     end
-    if approx == "tap3"
+    if approx==:emf3 
         rbm.W3 = rbm.W2 .* rbm.W        # Update Cube   [for EMF-TAP3]
     end
  end
 
-function regularize_weight_gradient!(rbm::RBM,LearnRate::Float64;L2Penalty::Float64=NaN,L1Penalty::Float64=NaN,DropOutRate::Float64=NaN)
+function regularize_weight_gradient!(rbm::RBM,LearnRate::Float64;
+                                     L2Penalty::Float64=NaN,
+                                     L1Penalty::Float64=NaN,
+                                     DropOutRate::Float64=NaN)
     ## Quadratic penalty on weights (Energy shrinkage)
     if !isnan(L2Penalty)
         axpy!(-LearnRate*L2Penalty,rbm.W,rbm.dW)
@@ -57,31 +67,40 @@ function regularize_weight_gradient!(rbm::RBM,LearnRate::Float64;L2Penalty::Floa
     end
 end
 
-function get_negative_samples(rbm::RBM,vis_init::Mat{Float64},hid_init::Mat{Float64},approx::AbstractString, iterations::Int)
-    if approx=="naive" || contains(approx,"tap")
-        v_neg, h_neg = equilibrate(rbm,vis_init,hid_init; iterations=iterations, approx=approx)
+function get_negative_samples(rbm::RBM, vis_init::Mat{Float64},
+                              hid_init::Mat{Float64}, approx, 
+                              iterations::Int)
+    if approx==:emf1 || approx==:emf2 || approx==:emf3
+        v_neg, h_neg = equilibrate(rbm,vis_init,hid_init; 
+                                   iterations=iterations, approx=approx)
     end
 
-    if approx=="CD"
-        # In the case of Gibbs/mcmc sampling, we will take the binary visible samples as the negative
-        # visible samples, and the expectation (means) for the negative hidden samples.
-        v_neg, _, _, h_neg = mcmc(rbm, hid_init; iterations=iterations, StartMode="hidden")
+    if approx==:sampling
+        # In the case of Gibbs/mcmc sampling, we will take the binary visible 
+        # samples as the negative visible samples, and the expectation (means) 
+        # for the negative hidden samples.
+        v_neg, _, _, h_neg = mcmc(rbm, hid_init; 
+                                  iterations=iterations, StartMode="hidden")
     end
 
     return v_neg, h_neg
 end
 
-function generate(rbm::RBM,vis_init::Mat{Float64},approx::AbstractString,SamplingIterations::Int)
+function generate(rbm::RBM, vis_init::Mat{Float64},
+                  approx, SamplingIterations::Int)
     Nsamples = size(vis_init,2)
     Nhid     = size(rbm.hbias,1)
     h_init  = zeros(Nsamples,Nhid)
 
-    if approx=="naive" || contains(approx,"tap")
-        _, hid_mag = equilibrate(rbm,vis_init,hid_init; iterations=SamplingIterations, approx=approx)
+    if approx==:emf1 || approx==:emf2 || approx==:emf3
+        _, hid_mag = equilibrate(rbm,vis_init,hid_init; 
+                                 iterations=SamplingIterations, approx=approx)
     end
 
-    if approx=="CD"
-        _, hid_mag, _, _ = mcmc(rbm, vis_init; iterations=SamplingIterations, StartMode="visible")
+    if approx==:sampling
+        _, hid_mag, _, _ = mcmc(rbm, vis_init; 
+                                iterations=SamplingIterations, 
+                                StartMode="visible")
     end
 
     samples,_ = sample_visibles(rbm,hid_mag)
@@ -89,36 +108,49 @@ function generate(rbm::RBM,vis_init::Mat{Float64},approx::AbstractString,Samplin
     return reshape(samples,rbm.VisShape)
 end
 
-function fit_batch!(rbm::RBM, vis::Mat{Float64};
-                    persistent=true, lr=0.1, NormalizationApproxIter=1,
-                    weight_decay="none",decay_magnitude=0.01, approx="CD")
-    
-    # Determine how to acquire the positive samples based upon the persistence mode.
+function fit_batch!(rbm::RBM, vis::Mat{Float64}, opts::Dict;
+                    persistent=nothing, lr=nothing)
+    # If a different learning rate isn't specified, we use the one in the 
+    # the options dictionary.
+    if lr==nothing
+      lr = opts[:learnRate]
+    end
+    if persistent==nothing
+      persistent = opts[:persist]
+    end
+
+
+    # Determine how to acquire the positive samples based upon 
+    # the persistence mode.
     v_pos = vis
     h_samples, h_pos = sample_hiddens(rbm,v_pos)
     # Set starting points in teh case of persistence
     if persistent
-        if approx=="naive" || contains(approx,"tap")
+        if opts[:approxType]==:emf1 || 
+           opts[:approxType]==:emf2 || opts[:approxType]==:emf3
             v_init = copy(rbm.persistent_chain_vis)      
             h_init = copy(rbm.persistent_chain_hid)       
         end
-        if approx=="CD" 
+        if opts[:approxType]==:sampling
             v_init = vis               # A dummy setting
             h_init,_ = sample_hiddens(rbm,rbm.persistent_chain_vis)
         end
     else
-        if approx=="naive" || contains(approx,"tap")
+        if opts[:approxType]==:emf1 || 
+           opts[:approxType]==:emf2 || opts[:approxType]==:emf3
             v_init = vis
             h_init = h_pos
         end
-        if approx=="CD"
+        if opts[:approxType]==:sampling
             v_init = vis               # A dummy setting
             h_init = h_samples
         end
     end        
 
     # Calculate the negative samples according to the desired approximation mode
-    v_neg, h_neg = get_negative_samples(rbm,v_init,h_init,approx,NormalizationApproxIter)
+    v_neg, h_neg = get_negative_samples(rbm,v_init,h_init,
+                                        opts[:approxType],
+                                        opts[:approxIters])
 
     # If we are in persistent mode, update the chain accordingly
     if persistent
@@ -127,14 +159,17 @@ function fit_batch!(rbm::RBM, vis::Mat{Float64};
     end
 
     # Update on weights
-    calculate_weight_gradient!(rbm,h_pos,v_pos,h_neg,v_neg,lr,approx=approx)
-    if weight_decay == "l2"
-        regularize_weight_gradient!(rbm,lr;L2Penalty=decay_magnitude)
+    calculate_weight_gradient!(rbm,h_pos,v_pos,h_neg,v_neg,lr,
+                               approx=opts[:approxType])
+    if opts[:weightDecayType] == :l2
+        regularize_weight_gradient!(rbm,lr;
+                                    L2Penalty=opts[:weightDecayMagnitude])
     end
-    if weight_decay == "l1"
-        regularize_weight_gradient!(rbm,lr;L1Penalty=decay_magnitude)
+    if opts[:weightDecayType] == :l1
+        regularize_weight_gradient!(rbm,lr;
+                                    L1Penalty=opts[:weightDecayMagnitude])
     end
-    update_weights!(rbm,approx)
+    update_weights!(rbm,opts[:approxType])
 
     # Gradient update on biases
     rbm.hbias += vec(lr * (sum(h_pos, 2) - sum(h_neg, 2)))
@@ -260,12 +295,8 @@ function fit(rbm::RBM, X::Mat{Float64}, opts::Dict)
             batch = X[:, ((i-1)*opts[:batchSize] + 1):min(i*opts[:batchSize], end)]
             batch = full(batch)
           
-            fit_batch!(rbm, batch; persistent=usePersistent, 
-                                   NormalizationApproxIter=opts[:approxIters],
-                                   weight_decay=opts[:weightDecayType],
-                                   decay_magnitude=opts[:weightDecayMagnitude],
-                                   lr=scaledLearningRate, 
-                                   approx=opts[:approxType])
+            fit_batch!(rbm, batch, opts; persistent=usePersistent, 
+                                         lr=scaledLearningRate)
             
         end
         

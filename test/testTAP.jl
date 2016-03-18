@@ -9,12 +9,7 @@ function run_mnist()
     binarize!(X;threshold=0.05)
 
     TrainSet = X
-    ValidSet = []
     HiddenUnits = 50;
-    Epochs = 10;
-    MCMCIter = 1;
-    EMFIter = 3
-    EMFPersistStart=5
 
     # Set Global Training Parameters
     options = Dict()
@@ -24,21 +19,21 @@ function run_mnist()
     options[:persist] = true
     options[:monitorEvery] = 3
     options[:monitorVis] = false
-    options[:weightDecayType] = "l2"
+    options[:weightDecayType] = :l2
     options[:weightDecayMagnitude] = 0.001
     options[:validationSet] = []
     options[:momentum] = 0.5
     # CD params
     cdOptions = deepcopy(options)
-    cdOptions[:approxType] = "CD"
+    cdOptions[:approxType] = :sampling
     # TAP params
     tapOptions = deepcopy(options)
-    tapOptions[:approxType] = "tap2"
+    tapOptions[:approxType] = :emf2
     tapOptions[:approxIters] = 3
     tapOptions[:persistStart] = 5
     # NMF params
     nmfOptions = deepcopy(tapOptions)
-    nmfOptions[:approxType] = "naive"
+    nmfOptions[:approxType] = :emf1
 
     # Initialize models
     rbm1 = BernoulliRBM(28*28, HiddenUnits, (28,28); TrainData=TrainSet, sigma = 0.01)

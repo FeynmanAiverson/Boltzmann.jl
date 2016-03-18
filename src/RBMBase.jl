@@ -63,17 +63,17 @@ function RBM(V::Type, H::Type, n_vis::Int, n_hid::Int, visshape::Tuple{Int,Int};
         @devec InitialVisBias = log(ProbVis ./ (1-ProbVis)) # Biasing as the log-proportion
     end
 
-    RBM{V,H}(W,                                             # W
-             W.*W,                                          # W2
-             W.*W.*W,                                       # W3
-             vec(InitialVisBias),                           # vbias
-             zeros(n_hid),                                  # hbias
-             zeros(n_hid, n_vis),                           # dW
-             zeros(n_hid, n_vis),                           # dW_prev
-             Array(Float64, 0, 0),                          # persistent_chain_vis
-             Array(Float64, 0, 0),                          # persistent_chain_hid
-             momentum,                                      # momentum
-             visshape)                                      # Shape of the visible units (for display)
+    RBM{V,H}(W,                     # W
+             W.*W,                  # W2
+             W.*W.*W,               # W3
+             vec(InitialVisBias),   # vbias
+             zeros(n_hid),          # hbias
+             zeros(n_hid, n_vis),   # dW
+             zeros(n_hid, n_vis),   # dW_prev
+             Array(Float64, 0, 0),  # persistent_chain_vis
+             Array(Float64, 0, 0),  # persistent_chain_hid
+             momentum,              # momentum
+             visshape)              # Shape of the visible units (for display)
 end
 
 
