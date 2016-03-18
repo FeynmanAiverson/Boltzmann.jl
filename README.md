@@ -139,7 +139,7 @@ Integration with Mocha
 List of Training Options
 ------------------------
 
-Options for our training dictionary
+Options for our training dictionary. (*) indicates a required parameter that does not have a default setting (i.e. must be set by user to match their specific problem).
 
 | *Variable Name* | *Type* | *Description* |
 | --------------- | ------ | ------------- |
@@ -156,4 +156,6 @@ Options for our training dictionary
 | validationSet | `Mat{Float64}` | Specify a validation dataset to chart scoring results with.
 | monitorEvery | `Integer` | Choose how many epochs between costly RBM score calculations. |
 | showMonitor | `Boolean` | Whether or not to display charts during training using Matplotlib. |
+
+
 

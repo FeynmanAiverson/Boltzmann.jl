@@ -6,7 +6,7 @@ using HDF5
 function run_mnist()
     X, y = traindata()  # test data is smaller, no need to downsample
     normalize_samples!(X)
-    binarize!(X;threshold=0.01)
+    binarize!(X;threshold=0.05)
 
     TrainSet = X
     ValidSet = []
@@ -18,15 +18,16 @@ function run_mnist()
 
     # Set Global Training Parameters
     options = Dict()
-    options[:epochs] = 10
+    options[:epochs] = 3
     options[:batchSize] = 100
     options[:learnRate] = 0.005
     options[:persist] = true
-    options[:monitorEvery] = 2
-    options[:monitorVis] = true
+    options[:monitorEvery] = 3
+    options[:monitorVis] = false
     options[:weightDecayType] = "l2"
     options[:weightDecayMagnitude] = 0.001
     options[:validationSet] = []
+    options[:momentum] = 0.5
     # CD params
     cdOptions = deepcopy(options)
     cdOptions[:approxType] = "CD"
@@ -40,9 +41,9 @@ function run_mnist()
     nmfOptions[:approxType] = "naive"
 
     # Initialize models
-    rbm1 = BernoulliRBM(28*28, HiddenUnits, (28,28); momentum=0.5, TrainData=TrainSet, sigma = 0.01)
-    rbm2 = BernoulliRBM(28*28, HiddenUnits, (28,28); momentum=0.5, TrainData=TrainSet, sigma = 0.01)
-    rbm3 = BernoulliRBM(28*28, HiddenUnits, (28,28); momentum=0.5, TrainData=TrainSet, sigma = 0.01)
+    rbm1 = BernoulliRBM(28*28, HiddenUnits, (28,28); TrainData=TrainSet, sigma = 0.01)
+    rbm2 = BernoulliRBM(28*28, HiddenUnits, (28,28); TrainData=TrainSet, sigma = 0.01)
+    rbm3 = BernoulliRBM(28*28, HiddenUnits, (28,28); TrainData=TrainSet, sigma = 0.01)
 
     # Train TAP
     finalrbmtap2,monitor = fit(rbm1, TrainSet, tapOptions)

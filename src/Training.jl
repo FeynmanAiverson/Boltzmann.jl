@@ -147,13 +147,13 @@ end
 """
     # Boltzmann.fit (training.jl)
     ## Function Call
-        `fit(rbm::RBM, X::Mat{Float64}[, persistent, lr, batch_size, NormalizationApproxIter, weight_decay, 
+        `fit(rbm::RBM, X::Mat{Float64}[, persistent, lr, opts[:batchSize], NormalizationApproxIter, weight_decay, 
                                          decay_magnitude, validation,monitor_ever, monitor_vis,
                                          approx, persistent_start, save_params])`
     ## Description
     The core RBM training function. Learns the weights and biasings using 
     either standard Contrastive Divergence (CD) or Persistent CD, depending on
-    the user options. 
+    the user opts. 
     
     - *rbm:* RBM object, initialized by `RBM()`/`GRBM()`
     - *X:* Set of training vectors
@@ -165,7 +165,7 @@ end
                            [default=1]
      - *lr:* Learning rate [default=0.1]
      - *n_iter:* Number of training epochs [default=10]
-     - *batch_size:* Minibatch size [default=100]
+     - *opts[:batchSize]:* Minibatch size [default=100]
      - *NormalizationApproxIter:* Number of Gibbs sampling steps on the Markov Chain [default=1]
      - *weight_decay:* A string value representing the regularization to add to apply to the 
                        weight magnitude during training {"none","l1","l2"}. [default="none"]
@@ -195,26 +195,13 @@ end
      - *::Monitor* -- A Monitor structure containing information on the training progress over
                       epochs.
 """
-function fit(rbm::RBM, X::Mat{Float64}, options::Dict)    
-    # Copy user options onto the default dictionary
-    options = dictionary_union(default_train_parameters(),options)
-    require_parameter(options,:learnRate)
-    require_parameter(options,:batchSize)    
-
-    # TOCHANGE: Copying over from dictionary onto the same variables
-    persistent=options[:persist]
-    lr=options[:learnRate]
-    n_iter=options[:epochs]
-    batch_size=options[:batchSize]
-    NormalizationApproxIter=options[:approxIters]
-    weight_decay=options[:weightDecayType]
-    decay_magnitude=options[:weightDecayMagnitude]
-    validation=options[:validationSet]
-    monitor_every=options[:monitorEvery]
-    monitor_vis=options[:monitorVis]
-    approx=options[:approxType]
-    persistent_start=options[:persistStart]
-    save_progress=(options[:saveFile],options[:saveEvery])
+function fit(rbm::RBM, X::Mat{Float64}, opts::Dict)    
+    # Copy user opts onto the default dictionary
+    opts = dictionary_union(default_train_parameters(),opts)
+    require_parameter(opts,:learnRate)
+    require_parameter(opts,:batchSize) 
+    # Force learning rate scaling, here
+    scaledLearningRate  = opts[:learnRate] / opts[:batchSize]
 
     # TODO: This line needs to be changed to accomodate real-valued units
     @assert minimum(X) >= 0 && maximum(X) <= 1
@@ -223,87 +210,89 @@ function fit(rbm::RBM, X::Mat{Float64}, options::Dict)
     n_features = size(X, 1)
     n_samples = size(X, 2)
     n_hidden = size(rbm.W,1)
-    n_batches = @compat Int(ceil(n_samples / batch_size))
+    n_batches = @compat Int(ceil(n_samples / opts[:batchSize]))
     N = n_hidden+n_features
 
     # Check for the existence of a validation set
     flag_use_validation=false
-    if length(validation)!=0
+    if !isempty(opts[:validationSet])
         flag_use_validation=true
-        n_valid=size(validation,2)        
+        n_valid=size(opts[:validationSet],2)        
     end
 
     # Create the historical monitor
-    ProgressMonitor = Monitor(n_iter,monitor_every;monitor_vis=monitor_vis,
-                                                   validation=flag_use_validation)
+    progressMonitor = Monitor(opts[:epochs],opts[:monitorEvery];
+                              monitor_vis=opts[:monitorVis],
+                              validation=flag_use_validation)
 
     # Print info to user
-    m_ = rbm.momentum
     info("=====================================")
     info("RBM Training")
     info("=====================================")
     info("  + Training Samples:     $n_samples")
     info("  + Features:             $n_features")
     info("  + Hidden Units:         $n_hidden")
-    info("  + Epochs to run:        $n_iter")
-    info("  + Persistent ?:         $persistent")
-    info("  + Training approx:      $approx")
-    info("  + Momentum:             $m_")
-    info("  + Learning rate:        $lr")
-    info("  + Norm. Approx. Iters:  $NormalizationApproxIter")   
-    info("  + Weight Decay?:        $weight_decay") 
-    info("  + Weight Decay Mag.:    $decay_magnitude")
+    info("  + Epochs to run:        $(opts[:epochs])")
+    info("  + Persistent ?:         $(opts[:persist])")
+    info("  + Training approx:      $(opts[:approxType])")
+    info("  + Momentum:             $(opts[:momentum])")
+    info("  + Learning rate:        $(opts[:learnRate])")
+    info("  + Norm. Approx. Iters:  $(opts[:approxIters])")   
+    info("  + Weight Decay?:        $(opts[:weightDecayType])") 
+    info("  + Weight Decay Mag.:    $(opts[:weightDecayMagnitude])")
     info("  + Validation Set?:      $flag_use_validation")    
     info("  + Validation Samples:   $n_valid")   
     info("=====================================")
 
-    # Scale the learning rate by the batch size
-    lr=lr/batch_size
-
     # Random initialization of the persistent chains
-    rbm.persistent_chain_vis,_ = random_columns(X,batch_size)
+    rbm.persistent_chain_vis,_ = random_columns(X,opts[:batchSize])
     rbm.persistent_chain_hid = condprob_hid(rbm, rbm.persistent_chain_vis)
 
-    use_persistent = false
-    for itr=1:n_iter
+    usePersistent = false
+    for itr=1:opts[:epochs]
         # Check to see if we can use persistence at this epoch
-        use_persistent = itr>=persistent_start ? persistent : false
+        usePersistent = itr>=opts[:persistStart] ? opts[:persist] : false
 
         tic()
 
         # Mini-batch fitting loop. 
         @showprogress 1 "Fitting Batches..." for i=1:n_batches
-            batch = X[:, ((i-1)*batch_size + 1):min(i*batch_size, end)]
+            batch = X[:, ((i-1)*opts[:batchSize] + 1):min(i*opts[:batchSize], end)]
             batch = full(batch)
           
-            fit_batch!(rbm, batch; persistent=use_persistent, 
-                                   NormalizationApproxIter=NormalizationApproxIter,
-                                   weight_decay=weight_decay,
-                                   decay_magnitude=decay_magnitude,
-                                   lr=lr, approx=approx)
+            fit_batch!(rbm, batch; persistent=usePersistent, 
+                                   NormalizationApproxIter=opts[:approxIters],
+                                   weight_decay=opts[:weightDecayType],
+                                   decay_magnitude=opts[:weightDecayMagnitude],
+                                   lr=scaledLearningRate, 
+                                   approx=opts[:approxType])
             
         end
         
         # Get the average wall-time in µs
         walltime_µs=(toq()/n_batches/N)*1e6
         
-        update_monitor!(rbm,ProgressMonitor,X,itr;bt=walltime_µs,validation=validation,lr=lr,mo=rbm.momentum)
-        show_monitor(rbm,ProgressMonitor,X,itr)
+        update_monitor!(rbm,progressMonitor,X,itr;
+                        bt=walltime_µs,
+                        validation=opts[:validationSet],
+                        lr=opts[:learnRate],
+                        mo=opts[:momentum])
+        show_monitor(rbm,progressMonitor,X,itr)
 
         # Attempt to save parameters if need be
-        if itr%save_progress[2]==0
+        if itr%opts[:saveEvery]==0
             rootName = @sprintf("Epoch%04d",itr)
-            if isfile(save_progress[1])
+            if isfile(opts[:saveFile])
                 info("Appending Params...")
-                append_params(save_progress[1],rbm,rootName)
+                append_params(opts[:saveFile],rbm,rootName)
             else
                 info("Creating file and saving params...")
-                save_params(save_progress[1],rbm,rootName)
+                save_params(opts[:saveFile],rbm,rootName)
             end
         end
     end
 
-    return rbm, ProgressMonitor
+    return rbm, progressMonitor
 end
 
 
