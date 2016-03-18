@@ -145,6 +145,7 @@ Options for our training dictionary
 | --------------- | ------ | ------------- |
 | learnRate | `Float64`  | Step size for gradient update. |
 | batchSize | `Integer` | Number of samples to average gradient over. |
+| momentum | `Float64` | Amount of momentum to apply to gradient update. |
 | epochs | `Integer` | Number of passes over the dataset to train for. |
 | approxType | `{:sample,:emf1,:emf2, :emf3}` | Method for approximating normalization. |
 | approxIters | `Integer` | Control the accuracy of the normalization approximation. |

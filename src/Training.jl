@@ -292,3 +292,20 @@ function fit(rbm::RBM, X::Mat{Float64};
 
     return rbm, ProgressMonitor
 end
+
+
+function default_train_parameters()
+    D = Dict(:learnRate => nothing,
+             :batchSize => nothing,
+             :epochs => Integer(10),
+             :approxType => :sample,
+             :approxIters => Integer(1),
+             :persist => false,
+             :persistStart => Integer(1),
+             :weightDecayType => :none,
+             :weightDecayMagnitude => Float64(0.0),
+             :validationSet => Array(Float64,0,0),
+             :monitorEvery => Integer(1),
+             :showMonitor => true)
+    return D    
+end

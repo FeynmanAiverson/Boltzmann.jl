@@ -35,7 +35,8 @@ export RBM,
        plot_vbias,
        plot_weightdist,
        chart_likelihood_evolution,
-       pin_field!
+       pin_field!,
+       default_train_parameters
 
 include("core.jl")
 
