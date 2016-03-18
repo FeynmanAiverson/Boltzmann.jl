@@ -1,0 +1,13 @@
+Options for our training dictionary
+
+learnRate
+    - aliased to 'gradientStepSize'
+persist
+persistStart
+epochs
+weightDecayType
+weightDecayMagnitude
+validationSet
+scoreEvery
+approximationType
+batchSize

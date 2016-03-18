@@ -136,3 +136,23 @@ Integration with Mocha
 ```
 
 
+List of Training Options
+------------------------
+
+Options for our training dictionary
+
+| *Variable Name* | *Type* | *Description* |
+| --------------- | ------ | ------------- |
+| learnRate | `Float64`  | Step size for gradient update. |
+| batchSize | `Integer` | Number of samples to average gradient over. |
+| epochs | `Integer` | Number of passes over the dataset to train for. |
+| approxType | `{:sample,:emf1,:emf2, :emf3}` | Method for approximating normalization. |
+| approxIters | `Integer` | Control the accuracy of the normalization approximation. |
+| persist | `Boolean` | Whether to use persistent particles for normalization approximation or not. |
+| persistStart | `Integer` | If `persist=True`, at which epoch should it begin. |
+| weightDecayType | `{:l2,:l1,:none}` | Method of regularization to apply to weights when calculating gradient. |
+| weightDecayMagnitude | `Float64` | Amount of chosen regularization to apply. |
+| validationSet | `Mat{Float64}` | Specify a validation dataset to chart scoring results with.
+| monitorEvery | `Integer` | Choose how many epochs between costly RBM score calculations. |
+| showMonitor | `Boolean` | Whether or not to display charts during training using Matplotlib. |
+
