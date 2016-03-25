@@ -54,6 +54,7 @@ Extended Mean-Field (EMF) Approximation
 Besides the use of the sampling-based default CD RBM training, we have also implemented the extended mean-field approach of
 
 > M. Gabrié, E. W. Tramel, F. Krzakala, ``Training restricted Boltzmann machines via the Thouless-Andreson-Palmer free energy,'' in Proc. Conf. on Neural Info. Processing Sys. (NIPS), Montreal, Canada, June 2015.
+<<<<<<< HEAD
 
 In this approach, rather than using MCMC to produce a number of independent samples used to collect the statistics in the negative training phase, 1st, 2nd, and 3rd order mean-field approximations are used to estimate equilibrium magnetizations on both the visible and hidden units. These real-valued magnetizations are then used in lieu of binary particles.
 
@@ -166,6 +167,60 @@ The syntax is unchanged from RBMs.
     prefit(dbm, TrainData; approx="tap2", NormalizationApproxIter=ApproxIter) 
     fit(rbm2,TrainData; approx="tap2", NormalizationApproxIter=ApproxIter)
 ```
+=======
+
+In this approach, rather than using MCMC to produce a number of independent samples used to collect the statistics in the negative training phase, 1st, 2nd, and 3rd order mean-field approximations are used to estimate equilibrium magnetizations on both the visible and hidden units. These real-valued magnetizations are then used in lieu of binary particles.
+
+```julia
+    ApproxIter = 3      # How many fixed-point EMF steps to take
+
+    # ...etc...
+
+    # Train using 1st order mean-field (naïve mean field)
+    fit(rbm1,TrainData; approx="naive", NormalizationApproxIter=ApproxIter)
+
+    # Train using 2nd order mean-field
+    fit(rbm2,TrainData; approx="tap2", NormalizationApproxIter=ApproxIter)
+
+    # Train using 3rd order mean-field
+    fit(rbm3,TrainData; approx="tap3", NormalizationApproxIter=ApproxIter)
+```
+
+MNIST Example
+-------------
+
+One can find the script for this example inside the `/examples` directory [of the repository](https://github.com/sphinxteam/Boltzmann.jl/blob/master/examples/mnistexample.jl).
+
+Sampling
+--------
+
+After training an RBM, one can generate samples from the distribution it has been trained to model. To start the sampling chain, one needs to provide an initialization to the visible layer. This can be either a sample from the training set or some random initialization, depending on the task to be accomplished. Below we see a short script to accomplish this sampling. 
+
+```julia
+# Experimental Parameters
+    NFeatures = 100
+
+    # Generate a random binary initialization
+    vis_init = rand(NFeatures,1)
+    binarize!(vis_init;threshold=0.5)
+
+    # Obtain the number of desired samples
+    vis_samples = generate(rbm,       # Trained RBM Model to sample from
+                           vis_init,   # Starting point for sampling chain
+                           "CD",       # Sampling method, here, MCMC/Gibbs
+                           100)        # Number of steps to take on sampling chain
+```
+
+
+RBM Variants
+------------
+
+Currently, this version of the Boltzmann package only provides support for the following RBM variants:
+
+ - `BernoulliRBM`: RBM with binary visible and hidden units.
+
+Support for real valued visibile units is still in progress. Some basic functionality for this feature was provided in limited, though unverified way, in the [upstream repository of this fork](https://https://github.com/dfdx/Boltzmann.jl). We suggest waiting until a verified implementation of the G-RBM is provided, here.
+>>>>>>> master
 
 Integration with Mocha
 ----------------------

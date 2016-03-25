@@ -66,15 +66,15 @@ function plot_scores(mon::Monitor)
 	ax_re[:set_ylabel]("Value")            
 	ax_re[:set_yscale]("log")
 
-	plt.title("Scoring")
-	plt.xlabel("Training Epoch")
-	plt.xlim((1,mon.Epochs[mon.LastIndex]))        
-	plt.grid("on")        
-	if mon.UseValidation
-		plt.legend(handles=[hpl;hvpl;htl;hvtl;hre;hvre],loc=2)
-	else
-		plt.legend(handles=[hpl;htl;hre],loc=2)
-	end
+    plt.title("Scoring")
+    plt.xlabel("Training Epoch")
+    plt.xlim((1,mon.Epochs[mon.LastIndex]))        
+    plt.grid("on")        
+    if mon.UseValidation
+        plt.legend(handles=[hpl;hvpl;htl;hvtl;hre;hvre],loc=3,fontsize=10)
+    else
+        plt.legend(handles=[hpl;htl;hre],loc=3,fontsize=10)
+    end
 end
 
 function plot_evolution(mon::Monitor)
@@ -117,10 +117,10 @@ function plot_vbias(rbm::RBM)
 end
 
 function plot_weightdist(rbm::RBM)
-	plt.hist(vec(rbm.W);bins=100)
-	plt.title("Weight Distribution")
-	plt.xlabel("Weight Value")
-	plt.ylabel("Frequency")
+    plt.hist(vec(rbm.W);bins=100)
+    plt.title("Weight Distribution")
+    plt.xlabel("Weight Value")
+    plt.ylabel("Frequency")
 end
 
 function figure_refresh(figureHandle)
@@ -130,30 +130,30 @@ function figure_refresh(figureHandle)
 end
 
 function WriteMonitorChartPDF(rbm::RBM,mon::Monitor,X::Mat{Float64},filename::AbstractString)
-	savefig = plt.figure(5;figsize=(12,15))
-	# Show Per-Epoch Progres
-	savefig[:add_subplot](321)
-		plot_scores(mon)
-		
-	savefig[:add_subplot](322)
-		plot_evolution(mon)      
+    savefig = plt.figure(5;figsize=(12,15))
+    # Show Per-Epoch Progres
+    savefig[:add_subplot](231)
+        plot_scores(mon)
+        
+    savefig[:add_subplot](232)
+        plot_evolution(mon)      
 
-	# Show Receptive fields
-	savefig[:add_subplot](323)
-		plot_rf(rbm)
+    # Show Receptive fields
+    savefig[:add_subplot](233)
+        plot_rf(rbm)
 
-	# Show the Visible chains/fantasy particle
-	savefig[:add_subplot](324)
-		plot_chain(rbm)
+    # Show the Visible chains/fantasy particle
+    savefig[:add_subplot](234)
+        plot_chain(rbm)
 
-	# Show the current visible biasing
-	savefig[:add_subplot](325)
-		# plot_vbias(rbm)
-		plot_hidden_activations(rbm,X)
+    # Show the current visible biasing
+    savefig[:add_subplot](235)
+        # plot_vbias(rbm)
+        plot_hidden_activations(rbm,X)
 
-	# Show the distribution of weight values
-	savefig[:add_subplot](326)
-		plot_weightdist(rbm)
+    # Show the distribution of weight values
+    savefig[:add_subplot](236)
+        plot_weightdist(rbm)
 
 	plt.savefig(filename;transparent=true,format="pdf",papertype="a4",frameon=true,dpi=300)
 	plt.close()

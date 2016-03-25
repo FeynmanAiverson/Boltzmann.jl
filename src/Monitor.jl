@@ -38,7 +38,7 @@ function Monitor(n_iter,monitor_every;monitor_vis=false,monitor_txt=true,validat
     blank_vector10 = copy(blank_vector1)
 
     if monitor_vis
-        fh = plt.figure(1;figsize=(12,15))
+        fh = plt.figure(1;figsize=(15,10))
     else
         fh = NaN
     end

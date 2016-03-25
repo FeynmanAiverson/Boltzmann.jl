@@ -8,10 +8,22 @@ function save_params(file::HDF5File, rbm::RBM, name::AbstractString)
     write(file, "$(name)___bias", rbm.hbias)
 end
 
-function save_params(filename::HDF5File, rbm::RBM, name::AbstractString)
+function save_params(file::HDF5File, rbm::RBM, name::AbstractString)
     write(file, "$(name)___weight", rbm.W')
     write(file, "$(name)___vbias", rbm.vbias)
     write(file, "$(name)___bias", rbm.hbias)
+end
+
+function save_params(filename::AbstractString,rbm::RBM,name::AbstractString)
+    h5open(filename,"w") do file
+        save_params(file,rbm,name)
+    end
+end
+
+function append_params(filename::AbstractString,rbm::RBM,name::AbstractString)
+    h5open(filename,"r+") do file
+        save_params(file,rbm,name)
+    end
 end
 
 function load_params(file::HDF5File, rbm::RBM, name::AbstractString)

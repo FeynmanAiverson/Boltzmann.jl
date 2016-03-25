@@ -33,9 +33,6 @@ end
 function update_weights!(rbm::RBM,approx::AbstractString)
     axpy!(1.0,rbm.dW,rbm.W)             # Take step: W = W + dW
     copy!(rbm.dW_prev, rbm.dW)          # Save the current step for future use
-    # if contains(approx,"tap")
-    #     rbm.W2 = rbm.W  .* rbm. W       # Update Square [for EMF-TAP2]
-    # end
     rbm.W2 = rbm.W  .* rbm. W
     if approx == "tap3"
         rbm.W3 = rbm.W2 .* rbm.W        # Update Cube   [for EMF-TAP3]
@@ -72,6 +69,23 @@ function get_negative_samples(rbm::RBM,vis_init::Mat{Float64},hid_init::Mat{Floa
     return v_neg, h_neg
 end
 
+function generate(rbm::RBM,vis_init::Mat{Float64},approx::AbstractString,SamplingIterations::Int)
+    Nsamples = size(vis_init,2)
+    Nhid     = size(rbm.hbias,1)
+    h_init  = zeros(Nsamples,Nhid)
+
+    if approx=="naive" || contains(approx,"tap")
+        _, hid_mag = equilibrate(rbm,vis_init,hid_init; iterations=SamplingIterations, approx=approx)
+    end
+
+    if approx=="CD"
+        _, hid_mag, _, _ = MCMC(rbm, vis_init; iterations=SamplingIterations, StartMode="visible")
+    end
+
+    samples,_ = sample_visibles(rbm,hid_mag)
+
+    return reshape(samples,rbm.VisShape)
+end
 
 function fit_batch!(rbm::RBM, vis::Mat{Float64};
                     persistent=true, lr=0.1, NormalizationApproxIter=1,
@@ -133,7 +147,7 @@ end
     ## Function Call
         `fit(rbm::RBM, X::Mat{Float64}[, persistent, lr, batch_size, NormalizationApproxIter, weight_decay, 
                                          decay_magnitude, validation,monitor_ever, monitor_vis,
-                                         approx, persistent_start])`
+                                         approx, persistent_start, save_params])`
     ## Description
     The core RBM training function. Learns the weights and biasings using 
     either standard Contrastive Divergence (CD) or Persistent CD, depending on
@@ -162,6 +176,17 @@ end
      - *score_every:* Controls at which epoch the progress of the fit is monitored. Useful to 
                       speed up the fit procedure if detailed progress monitoring is not required.
                       [default=5]
+     - *save_progress:* Controls the saving of RBM parameters throughout the course of the training.
+                     Should be passed as a tuple in the following manner:
+                        (::AbstractString,::Int)                      
+                     where the first field is the filename for the HDF5 used to save results and
+                     the second field specifies how often to write the parameters to disk. All
+                     results will be stored in the specified HDF5 file under the root headings
+                        `Epochxxxx___weight`
+                        `Epochxxxx___vbias`
+                        `Epochxxxx___bias`
+                     where `xxxx` specifies the epoch number in the `%04d` format.   
+                     [default=nothing]    
 
     ## Returns
      - *::RBM* -- A trained RBM model.
@@ -172,7 +197,7 @@ function fit(rbm::RBM, X::Mat{Float64};
              persistent=true, lr=0.1, n_iter=10, batch_size=100, NormalizationApproxIter=1,
              weight_decay="none",decay_magnitude=0.01,validation=[],
              monitor_every=5,monitor_vis=false, approx="CD",
-             persistent_start=1)
+             persistent_start=1, save_progress=nothing)
 
     # TODO: This line needs to be changed to accomodate real-valued units
     @assert minimum(X) >= 0 && maximum(X) <= 1
@@ -245,8 +270,22 @@ function fit(rbm::RBM, X::Mat{Float64};
         # Get the average wall-time in µs
         walltime_µs=(toq()/n_batches/N)*1e6
         
-        UpdateMonitor!(rbm,ProgressMonitor,X,itr;bt=walltime_µs,validation=validation)
+        UpdateMonitor!(rbm,ProgressMonitor,X,itr;bt=walltime_µs,validation=validation,lr=lr,mo=rbm.momentum)
         ShowMonitor(rbm,ProgressMonitor,X,itr)
+
+        # Attempt to save parameters if need be
+        if save_progress != nothing 
+            if itr%save_progress[2]==0
+                rootName = @sprintf("Epoch%04d",itr)
+                if isfile(save_progress[1])
+                    info("Appending Params...")
+                    append_params(save_progress[1],rbm,rootName)
+                else
+                    info("Creating file and saving params...")
+                    save_params(save_progress[1],rbm,rootName)
+                end
+            end
+        end
     end
 
     return rbm, ProgressMonitor

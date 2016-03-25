@@ -122,3 +122,14 @@ end
 function ProbVisCondOnHid(rbm::RBM, hid::Mat{Float64})
     return logsig(PassHidToVis(rbm,hid))
 end
+
+"""
+    # Boltzmann.PinField! (RBMBase.jl)
+"""
+function PinField!(rbm::RBM,pinning_field::Vec{Float64})
+    pos_inf_locations = pinning_field > 0
+    neg_inf_locations = pinning_field < 0
+
+    rbm.vbias(pos_inf_locations) =  Inf
+    rbm.vbias(neg_inf_locations) = -Inf
+end
