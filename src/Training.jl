@@ -290,5 +290,9 @@ function fit(rbm::RBM, X::Mat{Float64};
         end
     end
 
+    if monitor_vis 
+        plt.close()
+    end 
+    
     return rbm, ProgressMonitor
 end
