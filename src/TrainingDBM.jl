@@ -269,7 +269,9 @@ function fit(dbm::DBM, X::Mat{Float64};
         end
 
     end
-
+    if ProgressMonitor.MonitorVisual
+      plt.close()
+    end
     return dbm, ProgressMonitor
 end
 
