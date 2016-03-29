@@ -50,7 +50,8 @@ export RBM,
        get_negative_samples,
        free_energy,
        score_samples_TAP,
-       score_samples
+       score_samples,
+       free_energy_TAP
        
 
 include("core.jl")

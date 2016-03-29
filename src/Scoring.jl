@@ -53,6 +53,24 @@ function score_samples_TAP(rbm::RBM, vis::Mat{Float64}; n_iter=5)
     return fe_tap - fe
 end 
 
+function free_energy_TAP(rbm::RBM, vis::Mat{Float64}; n_iter=5)
+    _, _, m_vis, m_hid = iter_mag(rbm, vis; n_times=n_iter, approx="tap2")
+    eps=1e-6
+    m_vis = max(m_vis, eps)
+    m_vis = min(m_vis, 1.0-eps)
+    m_hid = max(m_hid, eps)
+    m_hid = min(m_hid, 1.0-eps)
+
+    m_vis2 = abs2(m_vis)
+    m_hid2 = abs2(m_hid)
+
+    S = - sum(m_vis.*log(m_vis)+(1.0-m_vis).*log(1.0-m_vis),1) - sum(m_hid.*log(m_hid)+(1.0-m_hid).*log(1.0-m_hid),1)
+    U_naive = - gemv('T',m_vis,rbm.vbias)' - gemv('T',m_hid,rbm.hbias)' - sum(gemm('N','N',rbm.W,m_vis).*m_hid,1)
+    Onsager = - 0.5 * sum(gemm('N','N',rbm.W2,m_vis-m_vis2).*(m_hid-m_hid2),1)    
+    fe_tap = U_naive + Onsager - S
+    return fe_tap 
+end 
+
 ################# DBM methods #####################################################################################
 ## DBM : the computation of the clamped free requires an equilibration . ##
 ## The following function calls on 'get_positive_sampling' ##
