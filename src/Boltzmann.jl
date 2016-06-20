@@ -51,7 +51,9 @@ export RBM,
        free_energy,
        score_samples_TAP,
        score_samples,
-       free_energy_TAP
+       free_energy_TAP,
+       sample_hiddens,
+       sample_visibles
        
 
 include("core.jl")
