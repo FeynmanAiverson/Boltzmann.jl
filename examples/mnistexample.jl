@@ -11,7 +11,7 @@ function run_mnist()
     # Get all MNIST training data
     X, y = traindata()  # test data is smaller, no need to downsample
     normalize_samples!(X)
-    binarize!(X;level=0.2)
+    binarize!(X;threshold=0.2)
 
     # Split validation set
     Gibbs = 1
@@ -23,7 +23,7 @@ function run_mnist()
     ValidSet = X[:,50001:end]
 
     # Initialize Model
-    m = BernoulliRBM(28*28, HiddenUnits,(28,28); momentum=0.5, dataset=TrainSet)
+    m = BernoulliRBM(28*28, HiddenUnits,(28,28); momentum=0.5, TrainData =TrainSet)
 
     # Run Training
     fit(m, TrainSet; n_iter=Epochs, 

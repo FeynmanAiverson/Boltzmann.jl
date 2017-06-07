@@ -1,7 +1,8 @@
 using Base.LinAlg.BLAS
 using HDF5
 using PyCall
-@pyimport matplotlib.pyplot as plt
+using PyPlot
+# @pyimport matplotlib.pyplot as plt
 @pyimport numpy as np
 
 abstract AbstractMonitor
@@ -38,7 +39,7 @@ function Monitor(n_iter,monitor_every;monitor_vis=false,monitor_txt=true,validat
     blank_vector10 = copy(blank_vector1)
 
     if monitor_vis
-        fh = plt.figure(1;figsize=(12,15))
+        fh =  figure(1;figsize=(12,15))
     else
         fh = NaN
     end

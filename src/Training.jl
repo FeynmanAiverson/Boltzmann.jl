@@ -6,7 +6,7 @@ using Compat
 using Devectorize
 using HDF5
 using PyCall
-@pyimport matplotlib.pyplot as plt
+# @pyimport matplotlib.pyplot as plt
 @pyimport numpy as np
 
 import StatsBase.fit

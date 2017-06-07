@@ -5,7 +5,8 @@ using Compat
 using Devectorize
 using HDF5
 using PyCall
-@pyimport matplotlib.pyplot as plt
+using PyPlot
+# @pyimport matplotlib.pyplot as plt
 @pyimport numpy as np
 
 import StatsBase.fit
@@ -270,7 +271,7 @@ function fit(dbm::DBM, X::Mat{Float64};
 
     end
     if ProgressMonitor.MonitorVisual
-      plt.close()
+       close()
     end
     return dbm, ProgressMonitor
 end
@@ -329,7 +330,7 @@ function fit_doubled(rbm,X::Mat{Float64}, which::AbstractString;
     # Create the historical monitor
     ProgressMonitor = Monitor(n_iter,monitor_every;monitor_vis=monitor_vis,
                                                    validation=flag_use_validation)
-    # ProgressMonitor.FigureHandle=plt.figure("DBM";figsize=(12,15))
+    # ProgressMonitor.FigureHandle= figure("DBM";figsize=(12,15))
 
     # Print info to user
     m_ = rbmaux.momentum
