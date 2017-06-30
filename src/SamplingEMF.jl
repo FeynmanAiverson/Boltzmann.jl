@@ -217,6 +217,85 @@ function clamped_equilibrate(dbm::DBM, vis::Mat{Float64}, array_hid_init::Array{
    return vis, array_m_hid
 end
 
+
+##### For adatap
+function reg_logsig(x::Mat{Float64};thres=1e-5)
+    return max(min(logsig(x),1-thres),thres)
+     
+end
+function reg_logsig(x::Vec{Float64})
+    return max(min(logsig(x),1-thres),thres)
+     
+end
+
+function VAMP(rbm,vis; damp=0.5, tmax=10, b0 = log(0.75/(1-0.75)))
+
+    HiddenUnits,VisibleUnits = size(rbm.W)
+    allUnits = VisibleUnits+HiddenUnits
+    J = [[zeros(VisibleUnits,VisibleUnits) rbm.W'];[rbm.W zeros(HiddenUnits, HiddenUnits)]]
+    h = [rbm.vbias ; rbm.hbias]
+    lambda=eigmax(J)
+    batchsize = size(vis,2)
+    ### this time As is the collection of values on the diagonal (1st dim), for all init in the batch (2nd dim)    
+
+
+    hid = logsig(rbm.W * vis .+ rbm.hbias) #rand(HiddenUnits).<
+    B_1 = [(2*vis-1)*b0; log(hid./(1.-hid))] 
+    A_1 = 1e-3*ones(allUnits,batchsize)
+    B_2 = zeros(allUnits,batchsize)
+    A_2 = zeros(allUnits,batchsize)
+    a_2 = zeros(allUnits,batchsize)
+
+    B_1old = zeros(allUnits,batchsize)
+    A_1old = zeros(allUnits,batchsize)
+    B_2old = zeros(allUnits,batchsize)
+    A_2old = zeros(allUnits,batchsize)
+    C_2 = zeros(allUnits,allUnits,batchsize)
+    a_2old = a_2
+    C_2old = C_2
+
+    for t=1:tmax
+    #     # damping
+        a_1 = reg_logsig(B_1 - 0.5*A_1)                                   #24
+        c_1 = a_1 .* (1 - a_1)                                      #24
+        A_2 = damp*(1./c_1 - A_1) + (1-damp)*A_2old          #25
+
+        for k=1:batchsize
+            if minimum(A_2[:,k]) < lambda 
+                println("regularizing A_2: ",minimum(A_2[:,k])-lambda)
+                idx = indmin(A_2[:,k])
+                multiplier = ceil(c_1[idx,k]/damp*(lambda+damp*A_1[idx,k]+(1-damp)*A_2old[idx,k]))
+                A_2[:,k] = damp*((multiplier./c_1[:,k]) - A_1[:,k]) + (1-damp)*A_2old[:,k]
+            else 
+                multiplier=1
+            end
+            B_2[:,k] = damp*(multiplier./(1-a_1[:,k]) - B_1[:,k]) + (1-damp)*B_2old[:,k]    #25
+            C_2[:,:,k] = inv(diagm(A_2[:,k])-J) #block_inv(A_2,W) #26
+            a_2[:,k] = C_2[:,:,k] * (B_2 .+ h)[:,k]
+            A_1[:,k] = damp*(1./diag(C_2[:,:,k]) - A_2[:,k] ) + (1-damp)*A_1old[:,k]   #27
+            B_1[:,k] = damp*(a_2[:,k]./diag(C_2[:,:,k]) - B_2[:,k]) + (1-damp)*B_1old[:,k]         #27
+        end
+
+        diff = mean((a_1 - a_2).^2)
+        println("mse(a_1 - a_2):",diff)
+        diff < 1e-4 ? break : nothing
+        if sum(isnan(a_2))>0 || sum(isnan(C_2))>0 || sum(C_2.==0)>0 || sum(c_1.==0)>0
+            C_2 =C_2old
+            a_2 =a_2old
+            a_1 = logsig(B_1old - 0.5*A_1old)
+            diff2 = mean((a_1 - a_2).^2)
+            println("correctionmse(a_1 - a_2):",diff2)
+            break
+        end
+        B_1old = B_1
+        A_1old = A_1
+        B_2old = B_2
+        A_2old = A_2
+
+    end
+    return a_2, C_2
+end
+
 ##-----------------------------------------------------------------------------##
 ### To be deprecated still used in Scoring.jl for the moment
 function iter_mag(rbm::RBM, vis::Mat{Float64}; n_times=3, approx="tap2")

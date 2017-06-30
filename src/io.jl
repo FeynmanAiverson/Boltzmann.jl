@@ -1,4 +1,3 @@
-
 using HDF5
 
 
@@ -14,6 +13,22 @@ function save_params(filename::HDF5File, rbm::RBM, name::AbstractString)
     write(file, "$(name)___bias", rbm.hbias)
 end
 
+function save_params(filename::AbstractString,rbm::RBM,name::AbstractString)
+    h5open(filename,"w") do file
+        write(file, "$(name)___weight", rbm.W')
+        write(file, "$(name)___vbias", rbm.vbias)
+        write(file, "$(name)___bias", rbm.hbias)
+    end
+end
+
+function append_params(filename::AbstractString,rbm::RBM,name::AbstractString)
+    h5open(filename,"r+") do file
+        write(file, "$(name)___weight", rbm.W')
+        write(file, "$(name)___vbias", rbm.vbias)
+        write(file, "$(name)___bias", rbm.hbias)
+    end
+end
+
 function load_params(file::HDF5File, rbm::RBM, name::AbstractString)
     rbm.W = read(file, "$(name)___weight")'
     rbm.vbias = read(file, "$(name)___vbias")
@@ -25,6 +40,7 @@ function save_params(file::HDF5File, net::Net)
         save_params(file, net[i], getname(net, i))
     end
 end
+
 save_params(path::AbstractString, net::Net) = h5open(path, "w") do h5
     save_params(h5, net)
 end

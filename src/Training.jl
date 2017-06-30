@@ -42,6 +42,20 @@ function update_weights!(rbm::RBM,approx::AbstractString)
     end
  end
 
+ function calculate_weight_gradient_adatap!(rbm,v_pos,h_pos,a_neg, C_neg,lr; 
+                NormalizationApproxIter=NormalizationApproxIter)
+   ## Load step buffer with negative-phase  
+    HiddenUnits,VisibleUnits = size(rbm.W)
+    rbm.dW =  lr*((reshape(sum(C_neg[1:VisibleUnits,VisibleUnits+1:end,:],3),(VisibleUnits,HiddenUnits))') .+ a_neg[VisibleUnits+1:end,:] * a_neg[1:VisibleUnits,:]') # dW <- LearRate*<h_neg,v_neg>
+    # gemm!('N', 'T', lr, h_neg, v_neg, 0.0, rbm.dW)          
+    ## Stubtract step buffer from positive-phase to get gradient    
+    gemm!('N', 'T', lr, h_pos, v_pos, -1.0, rbm.dW)         # dW <- LearnRate*<h_pos,v_pos> - dW
+    
+    ## Apply Momentum (adding last gradient to this one)    
+    axpy!(rbm.momentum, rbm.dW_prev, rbm.dW)    # rbm.dW += rbm.momentum * rbm.dW_prev
+    
+end
+
 function regularize_weight_gradient!(rbm::RBM,LearnRate::Float64;L2Penalty::Float64=NaN,L1Penalty::Float64=NaN,DropOutRate::Float64=NaN)
     ## Quadratic penalty on weights (Energy shrinkage)
     if !isnan(L2Penalty)
@@ -127,6 +141,37 @@ function fit_batch!(rbm::RBM, vis::Mat{Float64};
     return rbm
 end
 
+function fit_batch_adatap!(rbm::RBM, vis;
+                    persistent=true, lr=0.1, NormalizationApproxIter=1,
+                    weight_decay="none",decay_magnitude=0.01)
+    HiddenUnits,VisibleUnits = size(rbm.W)
+    v_pos = vis
+    h_pos = logsig(rbm.W * vis .+ rbm.hbias) #h_samples = rand(HiddenUnits).<
+    
+    
+    a_neg, C_neg = VAMP(rbm,vis; damp=0.5, tmax=NormalizationApproxIter)
+
+    # Update on weights
+    calculate_weight_gradient_adatap!(rbm,vis,h_pos,a_neg, C_neg,lr; NormalizationApproxIter=NormalizationApproxIter)
+   
+    if weight_decay == "l2"
+        regularize_weight_gradient!(rbm,lr;L2Penalty=decay_magnitude)
+    end
+    if weight_decay == "l1"
+        regularize_weight_gradient!(rbm,lr;L1Penalty=decay_magnitude)
+    end
+    axpy!(1.0,rbm.dW,rbm.W)             # Take step: W = W + dW
+    copy!(rbm.dW_prev, rbm.dW)          # Save the current step for future use
+    rbm.W2 = rbm.W  .* rbm. W
+
+    # Gradient update on biases
+    v_neg = a_neg[1:VisibleUnits,:]
+    h_neg = a_neg[VisibleUnits+1:end,:]
+    rbm.hbias += vec(lr * (sum(h_pos, 2) - sum(h_neg, 2)))
+    rbm.vbias += vec(lr * (sum(v_pos, 2) - sum(v_neg, 2)))
+
+    return rbm
+end
 
 """
     # Boltzmann.fit (training.jl)
@@ -247,6 +292,119 @@ function fit(rbm::RBM, X::Mat{Float64};
         
         UpdateMonitor!(rbm,ProgressMonitor,X,itr;bt=walltime_µs,validation=validation)
         ShowMonitor(rbm,ProgressMonitor,X,itr)
+    end
+
+    return rbm, ProgressMonitor
+end
+
+function fit_adatap(rbm::RBM, X::Mat{Float64};
+             persistent=true, lr=0.1, n_iter=10, batch_size=100, NormalizationApproxIter=1,
+             weight_decay="none",decay_magnitude=0.01,validation=[],
+             monitor_every=5, monitor_vis=false, approx="CD",
+             persistent_start=1,save_progress=nothing)
+
+    # TODO: This line needs to be changed to accomodate real-valued units
+    @assert minimum(X) >= 0 && maximum(X) <= 1
+
+    n_valid=0
+    n_features = size(X, 1)
+    n_samples = size(X, 2)
+    n_hidden = size(rbm.W,1)
+    n_batches = @compat Int(ceil(n_samples / batch_size))
+    N = n_hidden+n_features
+
+    # Check for the existence of a validation set
+    flag_use_validation=false
+    if length(validation)!=0
+        flag_use_validation=true
+        n_valid=size(validation,2)        
+    end
+
+    # Create the historical monitor
+    ProgressMonitor = Monitor(n_iter,monitor_every;monitor_vis=monitor_vis,
+                                                   validation=flag_use_validation)
+
+    # Print info to user
+    m_ = rbm.momentum
+    info("=====================================")
+    info("RBM Training")
+    info("=====================================")
+    info("  + Training Samples:     $n_samples")
+    info("  + Features:             $n_features")
+    info("  + Hidden Units:         $n_hidden")
+    info("  + Epochs to run:        $n_iter")
+    info("  + Persistent ?:         $persistent")
+    info("  + Training approx:      $approx")
+    info("  + Momentum:             $m_")
+    info("  + Learning rate:        $lr")
+    info("  + Norm. Approx. Iters:  $NormalizationApproxIter")   
+    info("  + Weight Decay?:        $weight_decay") 
+    info("  + Weight Decay Mag.:    $decay_magnitude")
+    info("  + Validation Set?:      $flag_use_validation")    
+    info("  + Validation Samples:   $n_valid")   
+    info("=====================================")
+
+    # Scale the learning rate by the batch size
+    lr=lr/batch_size
+
+    # Random initialization of the persistent chains
+    rbm.persistent_chain_vis,_ = random_columns(X,batch_size)
+    rbm.persistent_chain_hid = ProbHidCondOnVis(rbm, rbm.persistent_chain_vis)
+
+    use_persistent = false
+    for itr=1:n_iter
+        # Check to see if we can use persistence at this epoch
+        use_persistent = itr>=persistent_start ? persistent : false
+
+        tic()
+
+        # Mini-batch fitting loop. 
+        @showprogress 1 "Fitting Batches..." for i=1:n_batches
+            batch = X[:, ((i-1)*batch_size + 1):min(i*batch_size, end)]
+            batch = full(batch)
+          
+            fit_batch_adatap!(rbm, batch; persistent=use_persistent, 
+                                   NormalizationApproxIter=NormalizationApproxIter,
+                                   weight_decay=weight_decay,
+                                   decay_magnitude=decay_magnitude,
+                                   lr=lr)
+
+            if save_progress != nothing 
+                if itr%save_progress[2]==0
+                    rootName = @sprintf("Epoch%04d_batch%04d",itr,i)
+                    # rootName = "$(rootname)_($@sprintf("batch%04d",i)
+                    if isfile(save_progress[1])
+                        info("Appending Params...")
+                        append_params(save_progress[1],rbm,rootName)
+                    else
+                        info("Creating file and saving params...")
+                        save_params(save_progress[1],rbm,rootName)
+                    end
+                end
+            end
+            
+        end
+        
+        # Get the average wall-time in µs
+        walltime_µs=(toq()/n_batches/N)*1e6
+        
+        UpdateMonitor!(rbm,ProgressMonitor,X,itr;bt=walltime_µs,validation=validation)
+        ShowMonitor(rbm,ProgressMonitor,X,itr)
+
+         # Attempt to save parameters if need be
+        if save_progress != nothing 
+            if itr%save_progress[2]==0
+                rootName = @sprintf("Epoch%04d",itr)
+                if isfile(save_progress[1])
+                    info("Appending Params...")
+                    append_params(save_progress[1],rbm,rootName)
+                else
+                    info("Creating file and saving params...")
+                    save_params(save_progress[1],rbm,rootName)
+                end
+            end
+        end
+
     end
 
     return rbm, ProgressMonitor
